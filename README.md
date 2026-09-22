@@ -53,7 +53,7 @@ flowchart LR
     E -->|Accepted| F[Squash merge into main]
 ```
 
-The [CI workflow](.github/workflows/ci.yml) defines **Lint**, **Tests**, **Security**, and **Build**. Tests cover Linux Python 3.11–3.13 and macOS Python 3.12. Required-check enforcement is a separate GitHub setting to enable after the first successful server run.
+The [CI workflow](.github/workflows/ci.yml) runs on every push to `dev` or `main` and on pull requests. It defines **Lint**, **Tests**, **Security**, and **Build**. Tests cover Linux Python 3.11–3.13 and macOS Python 3.12. Required-check enforcement is a separate GitHub setting to enable after the first successful server run.
 
 - [Contribution guide](CONTRIBUTING.md)
 - [Architecture, testing, review, and roadmap — українською](docs/development-plan.md)
