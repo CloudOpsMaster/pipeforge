@@ -1,0 +1,10 @@
+# Direct development tools; Dependabot proposes updates weekly.
+bandit==1.9.4
+build==1.6.1
+hatchling==1.32.4
+mypy==2.3.1
+pip-audit==2.10.1
+pytest==9.1.1
+ruff==0.16.8
+twine==7.0.0
+types-PyYAML==6.0.12.20260906
