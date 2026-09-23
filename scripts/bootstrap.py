@@ -31,6 +31,7 @@ def fingerprint(framework: Path) -> str:
     digest.update(f"{sys.executable}:{sys.version}:{framework}".encode())
     files = [framework / "pyproject.toml", framework / "requirements-runtime.txt"]
     files.extend(sorted((framework / "src/pipeforge").rglob("*.py")))
+    files.extend(sorted((framework / "schema").glob("*.json")))
     for path in files:
         digest.update(str(path.relative_to(framework)).encode())
         digest.update(path.read_bytes())

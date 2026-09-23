@@ -4,6 +4,7 @@ import signal
 import subprocess
 import sys
 import time
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,10 @@ def source(*steps, **kwargs):
 
 
 def test_cli_help_and_version():
-    for args, expected in [(["--help"], "validate"), (["--version"], "0.1.0.dev0")]:
+    version = tomllib.loads((Path(__file__).parents[2] / "pyproject.toml").read_text())["project"][
+        "version"
+    ]
+    for args, expected in [(["--help"], "validate"), (["--version"], version)]:
         result = subprocess.run(
             [sys.executable, "-m", "pipeforge", *args], capture_output=True, text=True, timeout=5
         )

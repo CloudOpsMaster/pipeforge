@@ -1,6 +1,6 @@
 # Security policy
 
-PipeForge has a pre-alpha implementation and no supported releases yet. Report problems against the latest source checkout.
+Security fixes target the latest 0.1.x release. PipeForge is an early MVP; report problems with the version and a minimal reproduction.
 
 Do not post credentials, exploit details, or sensitive logs in public issues. If GitHub private vulnerability reporting is enabled, use the repository Security tab to report privately. Otherwise, open a minimal issue asking the maintainer for a private reporting channel, without disclosing vulnerability details. No response-time commitment is currently offered.
 

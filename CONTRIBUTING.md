@@ -1,6 +1,6 @@
 # Contributing to PipeForge
 
-PipeForge has a working pre-alpha shell runner. See the [configuration reference](docs/configuration.md) for the current contract and the [development plan](docs/development-plan.md) for architecture and future milestones.
+PipeForge has a working MVP shell runner. See the [configuration reference](docs/configuration.md) for the current contract and the [development plan](docs/development-plan.md) for architecture and future milestones.
 
 ## Local setup and checks
 
@@ -69,7 +69,7 @@ Collaborators with write access use a branch in the main repository instead of a
 
 CI defines **Lint**, **Tests**, **Security**, and **Build**. **Tests** aggregates all matrix jobs and fails unless every job succeeds. GitHub ruleset enforcement must be enabled separately after the first successful server run. Do not rename these four checks without updating the ruleset.
 
-The maintainer checks correctness, scope, tests, usability, compatibility, and handling of secrets. Automated checks support this review; they do not replace it. The maintainer performs the final squash merge. No release is created automatically from a PR or a merge.
+The maintainer checks correctness, scope, tests, usability, compatibility, and handling of secrets. Automated checks support this review; they do not replace it. The maintainer performs the final squash merge. PRs never publish. A version-changing merge into main publishes after the merged commit passes CI.
 
 Use clear commit messages such as `feat: add configuration validation` or `fix: preserve failed step exit code`. Conventional prefixes are helpful but do not trigger releases.
 
@@ -82,3 +82,5 @@ Use clear commit messages such as `feat: add configuration validation` or `fix: 
 - Review discussions are resolved and the maintainer accepts the change.
 
 Be respectful, give actionable feedback, and discuss the code rather than the person. Report suspected vulnerabilities according to [SECURITY.md](SECURITY.md).
+
+Version-changing PRs into `main` publish a GitHub Release after successful CI. See [the release procedure](docs/releasing.md). Routine changes need no version bump until a release is intended. Gitleaks scans all fetched Git history in the Security check; run `python scripts/scan_secrets.py` locally after committing (downloads a checksum-pinned scanner).

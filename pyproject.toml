@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pipeforge"
-version = "0.1.0.dev0"
+version = "0.1.0"
 description = "Run small, reusable pipelines locally and on CI runners."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ license-files = ["LICENSE"]
 authors = [{name = "PipeForge contributors"}]
 dependencies = ["PyYAML>=6.0.2,<7"]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Environment :: Console",
   "Operating System :: POSIX",
   "Programming Language :: Python :: 3",
@@ -33,8 +33,11 @@ Issues = "https://github.com/CloudOpsMaster/pipeforge/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["src/pipeforge"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"schema/pipeforge.schema.json" = "pipeforge/pipeforge.schema.json"
+
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "docs", "scripts", "run", "pipeforge.yml", "requirements-runtime.txt", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "LICENSE"]
+include = ["src", "tests", "examples", "docs", "scripts", "schema", "run", "pipeforge.yml", "requirements-runtime.txt", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/CloudOpsMaster/pipeforge/v0.1.0/schema/pipeforge.schema.json",
+  "title": "PipeForge pipeline",
+  "description": "Host-run jobs for PipeForge. Graph cycles, references and duplicate YAML keys are checked by pipeforge validate.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "oneOf": [{"required": ["jobs"]}, {"required": ["pipeline"]}],
+  "properties": {
+    "name": {"$ref": "#/$defs/nonEmpty"},
+    "values": {"$ref": "#/$defs/values"},
+    "secrets": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/envName"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from"],
+        "properties": {
+          "from": {"const": "env", "description": "Read the same-named environment variable."},
+          "required": {"type": "boolean", "default": true}
+        }
+      }
+    },
+    "jobs": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {"$ref": "#/$defs/jobName"},
+      "additionalProperties": {"$ref": "#/$defs/job"}
+    },
+    "pipeline": {
+      "type": "array",
+      "minItems": 1,
+      "deprecated": true,
+      "description": "Legacy sequential pipeline; prefer jobs with steps.",
+      "items": {"allOf": [{"$ref": "#/$defs/step"}, {"required": ["name"]}]}
+    }
+  },
+  "$defs": {
+    "string": {"type": "string", "not": {"pattern": "\u0000"}},
+    "nonEmpty": {"allOf": [{"$ref": "#/$defs/string"}, {"pattern": "\\S", "minLength": 1}]},
+    "envName": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+    "jobName": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"},
+    "values": {
+      "type": "object",
+      "propertyNames": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"},
+      "additionalProperties": {
+        "anyOf": [{"$ref": "#/$defs/string"}, {"type": "number"}, {"type": "boolean"}, {"$ref": "#/$defs/values"}]
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "String data only. Use ${values.*}, ${secrets.*}, or ${git.*}; read via quoted shell variables.",
+      "propertyNames": {"$ref": "#/$defs/envName"},
+      "additionalProperties": {"$ref": "#/$defs/string"}
+    },
+    "job": {
+      "type": "object",
+      "required": ["steps"],
+      "additionalProperties": false,
+      "properties": {
+        "description": {"$ref": "#/$defs/string"},
+        "needs": {
+          "description": "Prerequisite jobs, executed once in dependency order.",
+          "oneOf": [{"$ref": "#/$defs/jobName"}, {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/jobName"}}]
+        },
+        "env": {"$ref": "#/$defs/env"},
+        "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}}
+      }
+    },
+    "command": {
+      "allOf": [{"$ref": "#/$defs/nonEmpty"}, {"not": {"pattern": "\\$\\{(?:values|secrets|git)\\."}}],
+      "description": "POSIX shell command. Pass values and secrets through env, not script interpolation."
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{"required": ["run"]}, {"required": ["script"]}],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonEmpty"},
+        "run": {"$ref": "#/$defs/command"},
+        "script": {"$ref": "#/$defs/command", "deprecated": true},
+        "env": {"$ref": "#/$defs/env"},
+        "timeout": {"type": "number", "exclusiveMinimum": 0, "maximum": 86400, "default": 300}
+      }
+    }
+  }
+}

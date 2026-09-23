@@ -4,7 +4,7 @@
 
 Гасло: **Define once. Run anywhere. Debug locally.**
 
-Початкове ядро вже реалізоване: Python package, CLI та bootstrap launcher `./run`, jobs/steps/run, DAG і вибір jobs, shell executor, values/secrets/Git resolver, streaming-маскування, кольоровий summary, JSON/Markdown reports, unit/integration tests і CI workflow. Поточна версія — `0.1.0.dev0`; публічного релізу ще немає. Точний реалізований формат описано в [configuration.md](configuration.md), команди перевірки — у [CONTRIBUTING.md](../CONTRIBUTING.md). Налаштування GitHub, описані нижче, потрібно перевірити й застосувати окремо після першого успішного серверного CI.
+Початкове ядро вже реалізоване: Python package, CLI та bootstrap launcher `./run`, jobs/steps/run, DAG і вибір jobs, shell executor, values/secrets/Git resolver, streaming-маскування, кольоровий summary, JSON/Markdown reports, unit/integration tests і CI workflow. Поточний MVP — `0.1.0`; автоматична публікація описана в [releasing.md](releasing.md). Точний реалізований формат описано в [configuration.md](configuration.md), команди перевірки — у [CONTRIBUTING.md](../CONTRIBUTING.md). Налаштування GitHub, описані нижче, потрібно перевірити й застосувати окремо після першого успішного серверного CI.
 
 ## 1. Мінімальна архітектура
 
@@ -127,7 +127,7 @@ Maintainer перевіряє: чи вирішено проблему, чи зр
 | Actions | Дозволені; read-only token; заборонити Actions створювати/схвалювати PR |
 | Fork PR | GitHub-hosted runner; схвалення запусків зовнішніх contributors |
 | Security | Dependabot alerts, security updates, secret scanning та push protection — якщо доступні |
-| Secrets / releases | Реальні secrets, tags і releases поки не створювати |
+| Releases | Версія + changelog у PR; після зеленого main CI — автоматичний tag/release |
 
 PR workflow використовує `pull_request`, `permissions: contents: read`, `persist-credentials: false` при checkout і timeout для jobs. Не запускаємо неперевірений код PR через `pull_request_target`, з production secrets або на self-hosted runner. Дозвіл запустити CI для fork PR — окрема дія від схвалення коду до merge.
 
@@ -145,7 +145,7 @@ About: `Reusable CI/CD framework for local and CI pipeline execution.` Topics с
 4. **Прототип v0.1.0:** актуальна документація, чисте встановлення, ручна перевірка, changelog; лише потім tag/release за рішенням maintainer-а.
 5. **Розширення:** спочатку один корисний модуль, наприклад Docker, і мінімальний контракт модуля. Git modules з перевіреним immutable commit, інші CI adapters, environment overlays і діагностика — окремі наступні задачі.
 
-Релізи не прив’язані до кожного merge. Майбутній release workflow окремо тестує й будує конкретний commit. PyPI publishing додаємо пізніше через Trusted Publishing та захищене environment. `v1.0.0` — після стабілізації публічного API й конфігураційного формату; навіть до 1.0 несумісні зміни описуємо в changelog.
+Релізи не прив’язані до кожного merge. Release job публікує перевірені артефакти того самого main CI run, коли версія у pyproject.toml змінилась. PyPI publishing додаємо пізніше через Trusted Publishing та захищене environment. `v1.0.0` — після стабілізації публічного API й конфігураційного формату; навіть до 1.0 несумісні зміни описуємо в changelog.
 
 ## Наступні етапи після jobs + launcher
 

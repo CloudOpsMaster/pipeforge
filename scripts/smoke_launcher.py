@@ -20,7 +20,7 @@ def main() -> None:
         )
         framework = application / ".pf"
         framework.mkdir()
-        for name in ("src", "scripts"):
+        for name in ("src", "scripts", "schema"):
             shutil.copytree(
                 root / name, framework / name, ignore=shutil.ignore_patterns("__pycache__")
             )

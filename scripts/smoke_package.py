@@ -29,6 +29,19 @@ def main() -> None:
             check=True,
             timeout=120,
         )
+        subprocess.run(
+            [
+                str(python),
+                "-c",
+                "import json; from importlib.resources import files; "
+                "schema = files('pipeforge').joinpath('pipeforge.schema.json'); "
+                "assert json.loads(schema.read_text())['title']",
+            ],
+            cwd=temporary,
+            env=env,
+            check=True,
+            timeout=15,
+        )
         (temporary / "pipeforge.yml").write_text(
             (root / "examples/pipelines/basic/pipeforge.yml").read_text(encoding="utf-8"),
             encoding="utf-8",

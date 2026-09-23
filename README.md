@@ -4,18 +4,19 @@
 
 One `pipeforge.yml` owns your jobs and dependencies. Run the same job locally, in Jenkins, GitLab CI, or GitHub Actions. CI supplies the runner and credentials; PipeForge owns the build logic.
 
-**Working pre-alpha (`0.1.0.dev0`).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work. No release has been published.
+**MVP release [`v0.1.0`](https://github.com/CloudOpsMaster/pipeforge/releases/tag/v0.1.0).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work.
 
 ## Add to an application
 
-The implementation currently lives on `dev` (the default `main` branch does not contain the launcher yet):
+Pin the framework to a released version:
 
 ```sh
-git submodule add -b dev https://github.com/CloudOpsMaster/pipeforge.git .pf
+git submodule add https://github.com/CloudOpsMaster/pipeforge.git .pf
+git -C .pf checkout v0.1.0
 printf '.pipeforge/\n' >> .gitignore
 ```
 
-The submodule is pinned by the commit recorded in your application, even with `-b dev`. Review and commit submodule updates deliberately; do not automatically track the latest development commit in production.
+Commit `.gitmodules`, `.pf` and `.gitignore` in your application. The submodule is pinned by its recorded commit. Review and commit submodule updates deliberately; do not automatically track the latest development commit in production.
 
 Create `pipeforge.yml`:
 
@@ -88,3 +89,17 @@ Successful command output stays in per-job logs. Failures automatically show a b
 CI runs on pushes to `dev`/`main` and on PRs: **Lint**, **Tests**, **Security**, **Build**. Contributors propose PRs; the maintainer reviews and squash-merges. GitHub required-check enforcement is configured separately.
 
 Licensed under [Apache-2.0](LICENSE).
+
+## Editor support and releases
+
+With a YAML language-server extension, add this line to your application's `pipeforge.yml` for completion and structural validation:
+
+```yaml
+# yaml-language-server: $schema=.pf/schema/pipeforge.schema.json
+```
+
+`pipeforge validate` additionally checks dependency cycles and references. The schema is also bundled in the wheel and attached to each release.
+
+GitHub Releases contain a wheel, source distribution, schema and `SHA256SUMS`. Download the assets and run `shasum -a 256 -c SHA256SUMS` before installing the wheel. PyPI publishing is not configured.
+
+A version-changing PR merged into `main` publishes automatically **after all CI checks pass**. Ordinary merges with the same version do not create another release. See [release procedure](docs/releasing.md) and [changelog](CHANGELOG.md).
