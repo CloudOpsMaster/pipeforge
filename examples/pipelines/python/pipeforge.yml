@@ -1,0 +1,12 @@
+name: python-demo
+jobs:
+  test:
+    description: Test a tiny Python application using the standard library
+    steps:
+      - run: python -m unittest discover -s tests -v
+  build:
+    needs: test
+    description: Create an executable Python zip application
+    steps:
+      - run: python -m zipapp app -o application.pyz
+      - run: python application.pyz

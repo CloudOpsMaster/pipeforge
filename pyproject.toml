@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pipeforge"
+version = "0.1.0"
+description = "Run small, reusable pipelines locally and on CI runners."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "PipeForge contributors"}]
+dependencies = ["PyYAML>=6.0.2,<7"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Build Tools",
+]
+
+[project.scripts]
+pipeforge = "pipeforge.cli:main"
+
+[project.urls]
+Repository = "https://github.com/CloudOpsMaster/pipeforge"
+Issues = "https://github.com/CloudOpsMaster/pipeforge/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pipeforge"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"schema/pipeforge.schema.json" = "pipeforge/pipeforge.schema.json"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "examples", "docs", "scripts", "schema", "run", "pipeforge.yml", "requirements-runtime.txt", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-include = ["run"]
+extend-exclude = [".pipeforge"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src/pipeforge"]

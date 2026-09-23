@@ -1,0 +1,18 @@
+name: basic
+values:
+  greeting: Hello PipeForge
+jobs:
+  test:
+    description: Run a small assertion
+    steps:
+      - name: Check
+        run: python -c 'assert 2 + 2 == 4; print("Tests passed")'
+  build:
+    needs: test
+    description: Build a local greeting artifact
+    env:
+      GREETING: "${values.greeting}"
+    steps:
+      - name: Write artifact
+        run: |
+          python -c 'import os; from pathlib import Path; Path("greeting.txt").write_text(os.environ["GREETING"]); print(os.environ["GREETING"])'
