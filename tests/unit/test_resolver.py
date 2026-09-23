@@ -31,7 +31,7 @@ def test_nested_values_and_scalars():
         ({"a": "${values.b}", "b": "${values.a}"}, {}),
         ({"unused": "${values.missing}"}, {}),
         ({}, {"A": "${secrets.undeclared}"}),
-        ({}, {"A": "${git.sha}"}),
+        ({}, {"A": "${git.unknown}"}),
         ({}, {"A": "${values.unclosed"}),
         ({"nested": {"a": 1}}, {"A": "${values.nested}"}),
         ({"a": "${secrets.TOKEN}"}, {}),

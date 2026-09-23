@@ -1,62 +1,90 @@
 # PipeForge
 
-A small, extensible CI/CD framework: describe a pipeline once and run it locally or on a CI runner.
+**Define once. Run anywhere. Debug locally.**
 
-**Status: working pre-alpha (`0.1.0.dev0`).** The shell runner, CLI, configuration resolver, tests, and CI workflow are implemented. Install from this checkout; no release has been published. The configuration format may change before 1.0.
+One `pipeforge.yml` owns your jobs and dependencies. Run the same job locally, in Jenkins, GitLab CI, or GitHub Actions. CI supplies the runner and credentials; PipeForge owns the build logic.
 
-## Quick start
+**Working pre-alpha (`0.1.0.dev0`).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work. No release has been published.
 
-Requires Python 3.11+ and Linux or macOS with `/bin/sh`. Windows shell execution is not supported yet.
+## Add to an application
+
+The implementation currently lives on `dev` (the default `main` branch does not contain the launcher yet):
 
 ```sh
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e .
-
-pipeforge validate -f examples/hello-world/pipeforge.yml
-pipeforge run -f examples/hello-world/pipeforge.yml
+git submodule add -b dev https://github.com/CloudOpsMaster/pipeforge.git .pf
+printf '.pipeforge/\n' >> .gitignore
 ```
 
-Or create `pipeforge.yml` in your project:
+The submodule is pinned by the commit recorded in your application, even with `-b dev`. Review and commit submodule updates deliberately; do not automatically track the latest development commit in production.
+
+Create `pipeforge.yml`:
 
 ```yaml
 name: hello
-pipeline:
-  - name: Hello
-    script: python -c "print('Hello PipeForge')"
+jobs:
+  test:
+    steps:
+      - run: python -c 'assert 2 + 2 == 4'
+  build:
+    needs: test
+    steps:
+      - run: python -c 'print("Hello PipeForge")'
 ```
+
+Then run:
 
 ```sh
-pipeforge validate
-pipeforge run --dry-run
-pipeforge run
+./.pf/run
+./.pf/run build                 # Includes test first
+./.pf/run build --no-needs      # Explicitly assume prerequisites are satisfied
+./.pf/run --list
+./.pf/run --dry-run
+./.pf/run --from build
+./.pf/run --until build
+./.pf/run -v                    # Step progress
+./.pf/run -vv --color always    # Live, redacted command output
 ```
 
-PipeForge validates the configuration, resolves values and environment secrets, runs steps sequentially, and stops on failure. Each step runs in a separate `/bin/sh` process, with its working directory set to the configuration file's directory. Known declared secrets are masked in output.
+No manual `pip install` or virtualenv activation. The launcher prepares an isolated, cached runtime on first use; Python with `venv` support and package-index access are required. Warm runs reuse the runtime. `.pf/` is the framework; `.pipeforge/` holds application runtime, cache, logs, and reports.
 
-Output is buffered until a step finishes (maximum 8 MiB per step). The default timeout is 300 seconds. Commands run with your user permissions and inherited environment: only execute trusted pipelines. See the [configuration reference](docs/configuration.md) for syntax, limits, and exit codes.
+## Output
 
-Docker, Terraform, Kubernetes, remote Git modules, and package publishing come later.
+The terminal uses purple headings, cyan progress, green successes, amber notices, and red failures. Colors are automatic for terminals, can be forced with `--color always`, and disabled with `--color never` or `NO_COLOR` in automatic mode.
 
-## Contributing
-
-Everyone can fork the repository and propose changes. Keep each pull request focused; the maintainer reviews and merges it.
-
-```mermaid
-flowchart LR
-    A[Fork / branch] --> B[Code + tests + docs]
-    B --> C[Pull request]
-    C --> D[Lint · Tests · Security · Build]
-    D --> E[Maintainer review]
-    E -->|Changes requested| B
-    E -->|Accepted| F[Squash merge into main]
+```text
+  ╭─ PipeForge ─────────────────────────────────────╮
+  hello
+  local • a83f21c
+  ╰────────────────────────────────────────────────╯
+  ▶ test
+  ✓ test  0.03s
+  ▶ build
+  ✓ build  0.02s
+  ────────────────────────────────────────────────
+  ✓ PIPELINE PASSED
+  2 jobs • 2 passed • 0 failed • 0 skipped • 0.05s
+  Report: .pipeforge/latest/report.json
 ```
 
-The [CI workflow](.github/workflows/ci.yml) runs on every push to `dev` or `main` and on pull requests. It defines **Lint**, **Tests**, **Security**, and **Build**. Tests cover Linux Python 3.11–3.13 and macOS Python 3.12. Required-check enforcement is a separate GitHub setting to enable after the first successful server run.
+Successful command output stays in per-job logs. Failures automatically show a bounded error excerpt and a full-log path. `-vv` streams command output; all modes write live redacted logs, plus `report.json` and `summary.md`. Reports include job/step outcomes, duration, provider, and Git metadata.
 
-- [Contribution guide](CONTRIBUTING.md)
-- [Architecture, testing, review, and roadmap — українською](docs/development-plan.md)
+## Try this checkout
+
+```sh
+./run --list
+./run --dry-run
+./run                           # PipeForge checks itself
+./run tests                     # Setup, lint, types, tests
+./run -vv -f examples/pipelines/basic/pipeforge.yml
+```
+
+[Basic](examples/pipelines/basic/pipeforge.yml) and [Python](examples/pipelines/python/pipeforge.yml) examples execute in automated smoke tests. [CI wrappers](examples/ci/README.md) initialize the pinned submodule and invoke the same launcher. Docker, Terraform, Kubernetes, environment overlays, remote modules, and ForgeAI remain on the roadmap.
+
+- [Configuration and command reference](docs/configuration.md)
+- [Contributing and exact CI checks](CONTRIBUTING.md)
+- [Development plan — українською](docs/development-plan.md)
 - [Security policy](SECURITY.md)
+
+CI runs on pushes to `dev`/`main` and on PRs: **Lint**, **Tests**, **Security**, **Build**. Contributors propose PRs; the maintainer reviews and squash-merges. GitHub required-check enforcement is configured separately.
 
 Licensed under [Apache-2.0](LICENSE).

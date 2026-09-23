@@ -100,3 +100,4 @@ jobs:
       - run: python -m build
       - run: twine check --strict dist/*
       - run: python scripts/smoke_package.py dist
+      - run: python scripts/smoke_launcher.py

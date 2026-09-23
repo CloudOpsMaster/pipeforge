@@ -1,0 +1,13 @@
+stages: [pipeline]
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+pipeforge:
+  stage: pipeline
+  image: python:3.12
+  script:
+    - ./.pf/run --color always
+  artifacts:
+    when: always
+    paths:
+      - .pipeforge/runs/
+    expire_in: 7 days

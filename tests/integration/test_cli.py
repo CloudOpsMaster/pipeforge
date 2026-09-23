@@ -1,3 +1,4 @@
+import json
 import os
 import signal
 import subprocess
@@ -34,6 +35,7 @@ def test_real_pipeline_values_and_working_directory(cli, tmp_path):
             values={"message": "Hello PipeForge"},
         ),
         "run",
+        "-vv",
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Hello PipeForge" in result.stdout
@@ -48,6 +50,7 @@ def test_failed_step_stops_pipeline_and_reports_stderr(cli, tmp_path):
             {"name": "never", "script": "touch unexpected"},
         ),
         "run",
+        "-vv",
     )
     assert result.returncode == 1
     assert "exit code 7" in result.stdout
@@ -79,6 +82,7 @@ def test_all_references_validated_before_any_execution(cli, tmp_path):
             {"name": "invalid", "script": "true", "env": {"A": "${values.missing}"}},
         ),
         "run",
+        "-vv",
     )
     assert result.returncode == 2
     assert not (tmp_path / "unexpected").exists()
@@ -91,6 +95,7 @@ def test_missing_secret_fails_before_execution(cli, tmp_path):
             secrets={"DEMO_TOKEN": {"from": "env"}},
         ),
         "run",
+        "-vv",
     )
     assert result.returncode == 2
     assert not (tmp_path / "unexpected").exists()
@@ -110,6 +115,7 @@ def test_mask_multiline_secret_across_output_writes(cli):
             secrets={"DEMO_TOKEN": {"from": "env"}},
         ),
         "run",
+        "-vv",
         env={"DEMO_TOKEN": secret},
     )
     assert result.returncode == 0
@@ -129,6 +135,7 @@ def test_value_is_data_not_shell_code(cli, tmp_path):
             values={"input": injection},
         ),
         "run",
+        "-vv",
     )
     assert result.returncode == 0
     assert injection in result.stdout
@@ -142,9 +149,12 @@ def test_timeout_kills_descendants_and_suppresses_partial_secret(cli, tmp_path):
                 "name": "timeout",
                 "timeout": 0.2,
                 "script": "printf private-prefix; (sleep 1; touch unexpected) & wait",
-            }
+            },
+            secrets={"DEMO_TOKEN": {"from": "env"}},
         ),
         "run",
+        "-vv",
+        env={"DEMO_TOKEN": "private-prefix-secret"},
     )
     assert result.returncode == 1
     assert "timeout" in result.stdout
@@ -165,7 +175,7 @@ def test_output_limit(cli):
     )
     assert result.returncode == 1
     assert "8 MiB" in result.stdout
-    assert len(result.stdout) < 1000
+    assert len(result.stdout) < 3000
 
 
 @pytest.mark.parametrize(
@@ -195,6 +205,9 @@ def test_cancellation_stops_child_processes(tmp_path, cancel_signal, expected_co
         os.kill(process.pid, cancel_signal)
         stdout, stderr = process.communicate(timeout=5)
         assert process.returncode == expected_code, stdout + stderr
+        report = json.loads((tmp_path / ".pipeforge/latest/report.json").read_text())
+        assert report["result"] == "cancelled"
+        assert report["jobs"][0]["status"] == "cancelled"
         time.sleep(1.1)
         assert not (tmp_path / "unexpected").exists()
     finally:
@@ -204,7 +217,7 @@ def test_cancellation_stops_child_processes(tmp_path, cancel_signal, expected_co
 
 
 def test_hello_world_example(cli):
-    example = Path(__file__).parents[2] / "examples/hello-world/pipeforge.yml"
-    result = cli(example.read_text(), "run")
+    example = Path(__file__).parents[2] / "examples/pipelines/basic/pipeforge.yml"
+    result = cli(example.read_text(), "run", "-vv")
     assert result.returncode == 0
     assert "Hello PipeForge" in result.stdout

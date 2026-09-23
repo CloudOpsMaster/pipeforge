@@ -1,0 +1,2 @@
+# Launcher runtime only. Tooling belongs to the application's jobs.
+PyYAML==6.0.3

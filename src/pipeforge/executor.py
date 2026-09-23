@@ -1,5 +1,6 @@
 """Bounded, supervised POSIX shell execution of explicitly trusted scripts."""
 
+import codecs
 import os
 import selectors
 import signal
@@ -7,6 +8,7 @@ import signal
 # Executing explicitly trusted pipeline scripts is the runner's purpose.
 import subprocess  # nosec B404
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -23,7 +25,13 @@ class Result:
     reason: str = ""
 
 
-def execute(script: str, directory: Path, env: dict[str, str], timeout: float) -> Result:
+def execute(
+    script: str,
+    directory: Path,
+    env: dict[str, str],
+    timeout: float,
+    on_output: Callable[[str], None] | None = None,
+) -> Result:
     if os.name != "posix":
         raise ExecutionError("Shell execution currently requires Linux or macOS.")
     started = time.monotonic()
@@ -43,6 +51,8 @@ def execute(script: str, directory: Path, env: dict[str, str], timeout: float) -
             "Cannot start shell; check the working directory and environment."
         ) from None
     output = bytearray()
+    size = 0
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
     reason = ""
     code = 1
     try:
@@ -59,15 +69,21 @@ def execute(script: str, directory: Path, env: dict[str, str], timeout: float) -
                     chunk = os.read(key.fd, 65536)
                     if not chunk:
                         selector.unregister(key.fileobj)
-                    elif len(output) + len(chunk) > MAX_OUTPUT_BYTES:
+                    elif size + len(chunk) > MAX_OUTPUT_BYTES:
                         reason = "output exceeds 8 MiB limit"
                         break
                     else:
-                        output.extend(chunk)
+                        size += len(chunk)
+                        if on_output is None:
+                            output.extend(chunk)
+                        else:
+                            on_output(decoder.decode(chunk))
                 if reason:
                     break
             if not reason:
                 code = process.wait()
+                if on_output:
+                    on_output(decoder.decode(b"", final=True))
     except OSError:
         raise ExecutionError("Cannot supervise command output.") from None
     finally:

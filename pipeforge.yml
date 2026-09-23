@@ -1,0 +1,29 @@
+name: pipeforge
+
+jobs:
+  setup:
+    description: Install contributor tools into the launcher runtime
+    steps:
+      - run: python -m pip install -r requirements-dev.txt
+        timeout: 180
+  lint:
+    needs: setup
+    description: Check style and formatting
+    steps:
+      - run: python -m ruff check . && python -m ruff format --check .
+  types:
+    needs: setup
+    steps:
+      - run: python -m mypy
+  tests:
+    needs: [lint, types]
+    steps:
+      - run: python -m pytest
+  security:
+    needs: setup
+    steps:
+      - run: python -m bandit -r src -q
+  build:
+    needs: [tests, security]
+    steps:
+      - run: python -m build && python -m twine check --strict dist/*

@@ -30,7 +30,7 @@ def main() -> None:
             timeout=120,
         )
         (temporary / "pipeforge.yml").write_text(
-            (root / "examples/hello-world/pipeforge.yml").read_text(encoding="utf-8"),
+            (root / "examples/pipelines/basic/pipeforge.yml").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
         for args in (["--version"], ["validate"], ["run", "--dry-run"], ["run"]):

@@ -45,12 +45,26 @@ class Step:
 
 
 @dataclass(frozen=True)
+class Job:
+    name: str
+    steps: tuple[Step, ...]
+    needs: tuple[str, ...] = ()
+    description: str = ""
+
+
+@dataclass(frozen=True)
 class Config:
     name: str
     values: dict[str, Any]
     secrets: dict[str, Secret]
     pipeline: tuple[Step, ...]
     directory: Path
+    jobs: tuple[Job, ...] = ()
+    legacy: bool = False
+
+    @property
+    def execution_jobs(self) -> tuple[Job, ...]:
+        return self.jobs or (Job("default", self.pipeline),)
 
 
 def mapping(value: Any, location: str) -> dict[str, Any]:
@@ -108,7 +122,7 @@ def load_config(path: Path) -> Config:
         ) from None
 
     data = mapping(data, "configuration")
-    fields(data, {"name", "values", "secrets", "pipeline"}, "configuration")
+    fields(data, {"name", "values", "secrets", "pipeline", "jobs"}, "configuration")
     name = text(data.get("name"), "name")
     values = mapping(data.get("values", {}), "values")
     validate_values(values)
@@ -125,7 +139,57 @@ def load_config(path: Path) -> Config:
             raise ConfigError("Secret 'required' must be a boolean.")
         secrets[key] = Secret(required)
 
-    raw_steps = data.get("pipeline")
+    if ("pipeline" in data) == ("jobs" in data):
+        raise ConfigError("Declare either jobs or legacy pipeline, never both.")
+    jobs: list[Job] = []
+    if "pipeline" in data:
+        jobs.append(Job("default", parse_steps(data["pipeline"], {}, legacy=True)))
+    else:
+        raw_jobs = mapping(data["jobs"], "jobs")
+        if not raw_jobs:
+            raise ConfigError("jobs must not be empty.")
+        for key, raw in raw_jobs.items():
+            if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", key):
+                raise ConfigError("Job IDs must be identifiers of at most 64 characters.")
+            job = mapping(raw, "job")
+            fields(job, {"steps", "needs", "env", "description"}, "job")
+            needs = job.get("needs", [])
+            if isinstance(needs, str):
+                needs = [needs]
+            if not isinstance(needs, list) or any(not isinstance(item, str) for item in needs):
+                raise ConfigError("needs must be a job ID or a list of job IDs.")
+            if len(set(needs)) != len(needs):
+                raise ConfigError("needs contains duplicates.")
+            description = job.get("description", "")
+            if not isinstance(description, str) or "\0" in description:
+                raise ConfigError("Job description must be a string without NUL characters.")
+            env = parse_env(job.get("env", {}))
+            jobs.append(Job(key, parse_steps(job.get("steps"), env), tuple(needs), description))
+    from pipeforge.graph import ordered_jobs
+
+    ordered_jobs(tuple(jobs))  # Validate the entire graph before any selection or execution.
+    return Config(
+        name,
+        values,
+        secrets,
+        tuple(step for job in jobs for step in job.steps),
+        path.resolve().parent,
+        tuple(jobs),
+        "pipeline" in data,
+    )
+
+
+def parse_env(raw: Any) -> dict[str, str]:
+    env = mapping(raw, "env")
+    for key, value in env.items():
+        if not ENV_KEY.fullmatch(key) or not isinstance(value, str) or "\0" in value:
+            raise ConfigError("env requires environment identifiers and string values.")
+    return env
+
+
+def parse_steps(
+    raw_steps: Any, job_env: dict[str, str], *, legacy: bool = False
+) -> tuple[Step, ...]:
     if not isinstance(raw_steps, list) or not raw_steps:
         raise ConfigError("pipeline must be a non-empty list.")
     steps = []
@@ -133,24 +197,23 @@ def load_config(path: Path) -> Config:
     for index, raw_step in enumerate(raw_steps, 1):
         location = f"pipeline step {index}"
         step = mapping(raw_step, location)
-        fields(step, {"name", "script", "env", "timeout"}, location)
-        step_name = text(step.get("name"), f"{location} name")
+        fields(step, {"name", "run", "script", "env", "timeout"}, location)
+        step_name = text(step.get("name", None if legacy else f"Step {index}"), f"{location} name")
         if step_name in names:
             raise ConfigError("Step names must be unique.")
         names.add(step_name)
-        script = text(step.get("script"), f"{location} script")
-        if "${values." in script or "${secrets." in script:
+        if ("script" in step) == ("run" in step):
+            raise ConfigError("A step must contain exactly one of run or legacy script.")
+        script = text(step.get("run", step.get("script")), f"{location} run")
+        if any(prefix in script for prefix in ("${values.", "${secrets.", "${git.")):
             raise ConfigError(
                 "Use step env for PipeForge references, not shell script interpolation."
             )
-        env = mapping(step.get("env", {}), f"{location} env")
-        for key, value in env.items():
-            if not ENV_KEY.fullmatch(key) or not isinstance(value, str) or "\0" in value:
-                raise ConfigError("Step env requires environment identifiers and string values.")
+        env = {**job_env, **parse_env(step.get("env", {}))}
         timeout = step.get("timeout", 300)
         if type(timeout) not in (int, float) or not 0 < timeout <= 86400:
             raise ConfigError(
                 "Step timeout must be a number greater than 0 and at most 86400 seconds."
             )
         steps.append(Step(step_name, script, env, float(timeout)))
-    return Config(name, values, secrets, tuple(steps), path.resolve().parent)
+    return tuple(steps)

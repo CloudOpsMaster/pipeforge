@@ -2,7 +2,9 @@
 
 Мета — невеликий Python framework, у якому pipeline можна перевірити й запустити локально, а потім використати в CI. Починаємо з робочого ядра, тести й документацію додаємо разом із кодом.
 
-Початкове ядро вже реалізоване: Python package, CLI, shell executor, values/secrets resolver, маскування, unit/integration tests і CI workflow. Поточна версія — `0.1.0.dev0`; публічного релізу ще немає. Точний реалізований формат описано в [configuration.md](configuration.md), команди перевірки — у [CONTRIBUTING.md](../CONTRIBUTING.md). Налаштування GitHub, описані нижче, потрібно перевірити й застосувати окремо після першого успішного серверного CI.
+Гасло: **Define once. Run anywhere. Debug locally.**
+
+Початкове ядро вже реалізоване: Python package, CLI та bootstrap launcher `./run`, jobs/steps/run, DAG і вибір jobs, shell executor, values/secrets/Git resolver, streaming-маскування, кольоровий summary, JSON/Markdown reports, unit/integration tests і CI workflow. Поточна версія — `0.1.0.dev0`; публічного релізу ще немає. Точний реалізований формат описано в [configuration.md](configuration.md), команди перевірки — у [CONTRIBUTING.md](../CONTRIBUTING.md). Налаштування GitHub, описані нижче, потрібно перевірити й застосувати окремо після першого успішного серверного CI.
 
 ## 1. Мінімальна архітектура
 
@@ -36,8 +38,8 @@ src/pipeforge/
 tests/
   unit/
   integration/
-examples/hello-world/pipeforge.yml
-.github/workflows/ci.yml
+examples/pipelines/basic/pipeforge.yml
+.github/workflows/review.yml
 pyproject.toml
 ```
 
@@ -48,18 +50,18 @@ pyproject.toml
 ## 2. Перший робочий контракт
 
 - Python 3.11+; executor працює на Linux/macOS. CI містить Linux matrix та macOS job; Windows поки не підтримується.
-- Файл за замовчуванням — `pipeforge.yml`; `name` та непорожній список `pipeline` обов’язкові.
-- Крок має `name` і `script`; порядок виконання відповідає YAML.
+- Файл за замовчуванням — `pipeforge.yml`; `name` та непорожня mapping `jobs` обов’язкові; старий `pipeline` поки сумісний.
+- Job має `steps` і необов’язкові `needs`; крок має `run` і необов’язковий `name`. Граф виконується послідовно в топологічному порядку.
 - `validate` перевіряє структуру й посилання без запуску команд. Обов’язкові секрети перевіряються перед `run`; dry-run не друкує їхніх значень.
 - Успіх повертає `0`; помилка конфігурації та збій виконання повертають документовані ненульові коди.
-- На першому етапі немає environment overlays, `${git.sha}`, plugin discovery або завантаження Git modules.
+- `${git.sha}`, `${git.short_sha}`, `${git.branch}`, `${git.tag}` уже підтримуються через values/env. Environment overlays, plugin discovery і Git modules — наступні етапи.
 - Кольори вмикаються для інтерактивного термінала; звичайний текст придатний для CI.
 
 Секрети оголошуються через environment, без реальних значень у YAML. Не завантажуємо `.env` автоматично. Values і secrets підставляються лише в step `env`; у script читаємо звичайні shell variables або `os.environ`. PipeForge не додає секрети до shell-тексту, але автор script відповідає за те, як його команди використовують environment.
 
 ## 3. Автоматичні перевірки
 
-Один `ci.yml`, чотири стабільні назви checks. Перевірки запускаються паралельно на PR та push у `main`; кожне оновлення PR запускає їх знову.
+Один `review.yml`, чотири стабільні назви checks. Перевірки запускаються паралельно на PR та push у `dev`/`main`; кожне оновлення PR запускає їх знову.
 
 | Check | Що виконує |
 | --- | --- |
@@ -139,8 +141,18 @@ About: `Reusable CI/CD framework for local and CI pipeline execution.` Topics с
 
 1. **Реалізовано — package + CLI + CI:** `pyproject.toml`, `src/pipeforge`, CLI help, тести, чотири реальні checks, Dependabot. Серверний запуск CI й увімкнення required checks залишаються наступними діями після публікації змін.
 2. **Реалізовано — config + executor:** validate, послідовні shell steps, timeout, exit codes, hello-world, обмеження output і прибирання process group.
-3. **Реалізовано — resolver + logs:** values, env secrets, маскування, dry-run, кольори для термінала; regression tests перевіряють помилки й витоки секретів. Логи поки буферизуються до завершення кроку.
+3. **Реалізовано — resolver + logs:** values, env secrets, маскування, dry-run, кольори для термінала; regression tests перевіряють помилки й витоки секретів. Логи streaming-яться через redactor; кольорова консоль має summary, `-v`, `-vv`. Звіти й логи — у `.pipeforge/runs/`, `latest` веде на останній завершений run.
 4. **Прототип v0.1.0:** актуальна документація, чисте встановлення, ручна перевірка, changelog; лише потім tag/release за рішенням maintainer-а.
 5. **Розширення:** спочатку один корисний модуль, наприклад Docker, і мінімальний контракт модуля. Git modules з перевіреним immutable commit, інші CI adapters, environment overlays і діагностика — окремі наступні задачі.
 
 Релізи не прив’язані до кожного merge. Майбутній release workflow окремо тестує й будує конкретний commit. PyPI publishing додаємо пізніше через Trusted Publishing та захищене environment. `v1.0.0` — після стабілізації публічного API й конфігураційного формату; навіть до 1.0 несумісні зміни описуємо в changelog.
+
+## Наступні етапи після jobs + launcher
+
+1. Container executor: однаковий image локально й у CI; зараз працює host execution, тому однакове середовище ще не гарантується.
+2. Мінімальний `uses` plugin API та один Docker module.
+3. Terraform/Kubernetes/Helm modules й environment overlays.
+4. Remote modules з immutable commit verification; `doctor`.
+5. ForgeAI після стабілізації report schema: rules → пояснення → пропозиції; далі classifier/optional LLM. Без автоматичних руйнівних команд і декоративних confidence.
+
+Робочі гілки: `feature/*` → `dev` → перевірений `main`; релізи — tags `v*`, без `prod` branch. Нові можливості не рекламуємо як підтримувані, доки немає реалізації та тестів.

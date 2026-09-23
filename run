@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+"""Bootstrap PipeForge without manual installation."""
+
+import sys
+from pathlib import Path
+
+if sys.version_info < (3, 11):  # noqa: UP036 -- launcher must diagnose older Python.
+    raise SystemExit("PipeForge requires Python 3.11 or newer.")
+sys.path.insert(0, str(Path(__file__).resolve().parent / "scripts"))
+from bootstrap import main
+
+raise SystemExit(main())

@@ -11,10 +11,19 @@ MAX_RESOLVED_LENGTH = 65536
 
 
 class Resolver:
-    def __init__(self, config: Config, environ: Mapping[str, str], *, validate: bool = False):
+    def __init__(
+        self,
+        config: Config,
+        environ: Mapping[str, str],
+        *,
+        validate: bool = False,
+        git: Mapping[str, str] | None = None,
+    ):
         self.config = config
         self.secrets: dict[str, str] = {}
         self.cache: dict[str, str] = {}
+        self.git = git or {}
+        self.validating = validate
         for name, declaration in config.secrets.items():
             value = environ.get(name, "")
             if not validate and declaration.required and not value:
@@ -47,6 +56,14 @@ class Resolver:
             reference = match.group(1)
             if reference.startswith("values."):
                 return self.value(reference.removeprefix("values."), stack)
+            if reference.startswith("git."):
+                key = reference.removeprefix("git.")
+                if key not in {"sha", "short_sha", "branch", "tag"}:
+                    raise ConfigError("Unknown Git metadata reference.")
+                value = self.git.get(key, "")
+                if not self.validating and not value:
+                    raise ConfigError("Requested Git metadata is unavailable in this checkout.")
+                return value
             if reference.startswith("secrets.") and allow_secrets:
                 name = reference.removeprefix("secrets.")
                 if name in self.secrets:

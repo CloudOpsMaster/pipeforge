@@ -7,6 +7,14 @@ PipeForge has a working pre-alpha shell runner. See the [configuration reference
 Use Python 3.11+ on Linux or macOS:
 
 ```sh
+./run          # Bootstrap automatically; run setup, lint, types, tests, security and build
+./run tests    # Run tests with prerequisite jobs
+./run --list
+```
+
+The framework's own pipeline installs development tools into its isolated runtime. For an editable development environment and the complete CI checks (including online dependency audit and packaging/launcher smoke tests), use:
+
+```sh
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
@@ -21,11 +29,12 @@ pip-audit --skip-editable
 python -m build
 twine check --strict dist/*
 python scripts/smoke_package.py dist
+python scripts/smoke_launcher.py
 ```
 
 These are the same checks used by CI. `ruff format .` applies formatting. Tests need no network or service credentials; installation, dependency auditing, isolated builds, and the wheel installation check need network access. The smoke script expects exactly one wheel; keep `dist/` free of older versions when rebuilding.
 
-Run the example with `pipeforge run -f examples/hello-world/pipeforge.yml`. Keep runtime dependencies small. Add unit tests under `tests/unit` and subprocess-based CLI tests under `tests/integration`; use temporary directories and fake credentials.
+Run an example with `./run -vv -f examples/pipelines/basic/pipeforge.yml`. Keep runtime dependencies small. Add unit tests under `tests/unit` and subprocess-based CLI tests under `tests/integration`; use temporary directories and fake credentials. Every pipeline example is schema-validated; basic/Python examples execute under all supported provider flags. Real bootstrap installation is checked separately by the Build job.
 
 ## Propose a change
 

@@ -1,0 +1,17 @@
+pipeline {
+    agent any // Agent needs Python 3.11+, Git, and application tools.
+    stages {
+        stage('PipeForge') {
+            steps {
+                // Uses the submodule commit recorded in the application checkout.
+                sh 'git submodule update --init --recursive'
+                sh './.pf/run --color always'
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: '.pipeforge/runs/**', allowEmptyArchive: true
+        }
+    }
+}

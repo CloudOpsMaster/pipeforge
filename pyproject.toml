@@ -34,7 +34,7 @@ Issues = "https://github.com/CloudOpsMaster/pipeforge/issues"
 packages = ["src/pipeforge"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "docs", "scripts", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "LICENSE"]
+include = ["src", "tests", "examples", "docs", "scripts", "run", "pipeforge.yml", "requirements-runtime.txt", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "LICENSE"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -43,6 +43,8 @@ addopts = "-ra"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+extend-include = ["run"]
+extend-exclude = [".pipeforge"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
