@@ -4,7 +4,7 @@
 
 One `pipeforge.yml` owns your jobs and dependencies. Run the same job locally, in Jenkins, GitLab CI, or GitHub Actions. CI supplies the runner and credentials; PipeForge owns the build logic.
 
-**MVP release [`v0.1.0`](https://github.com/CloudOpsMaster/pipeforge/releases/tag/v0.1.0).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work.
+**Latest release [`v0.2.0`](https://github.com/CloudOpsMaster/pipeforge/releases/tag/v0.2.0).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work.
 
 ## Add to an application
 
@@ -12,7 +12,7 @@ Pin the framework to a released version:
 
 ```sh
 git submodule add https://github.com/CloudOpsMaster/pipeforge.git .pf
-git -C .pf checkout v0.1.0
+git -C .pf checkout v0.2.0
 printf '.pipeforge/\n' >> .gitignore
 ```
 
@@ -194,3 +194,26 @@ copies of the same run from executing. Reports remain in `.pipeforge/runs/`, one
 per attempt. `report.json` includes `resume_id`, `attempt`, `reused_jobs`, verification
 results, and `recovery_seconds` on success after a recorded failure (wall time from
 first failure, including waiting between attempts).
+
+
+## Reusable blocks, stages and native GitHub jobs
+
+Jobs can combine named `blocks` through `use: [runtime, checks]` with their own
+`steps`. Steps may repeat across blocks or block occurrences. A `stage` label
+groups jobs for presentation and targeted reruns; only `needs` defines dependencies.
+
+```sh
+./.pf/run --stage publish --max-parallel 2  # Fresh run of this stage only
+./.pf/run --stage publish --with-needs     # Include its prerequisites
+./.pf/run exec-job instagram              # Exactly one job
+./.pf/run plan
+./.pf/run graph --format mermaid
+./.pf/run render github -o .github/workflows/pipeline.yml
+```
+
+The generated workflow exposes separate jobs and parallel branches in GitHub,
+with declared artifact transport between runners. Reuse runtime blocks in each
+job that needs installed tools: runners do not share installations.
+These features are available starting with v0.2.0.
+See the [configuration reference](docs/configuration.md#blocks-and-stages) for
+repeat semantics, artifact reuse, reports and native CI limitations.

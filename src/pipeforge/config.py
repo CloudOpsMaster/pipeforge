@@ -3,7 +3,7 @@
 import math
 import re
 from collections.abc import Hashable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +42,14 @@ class Step:
     script: str
     env: dict[str, str]
     timeout: float = 300
+    block: str = ""
+
+
+@dataclass(frozen=True)
+class StepBlock:
+    name: str
+    steps: tuple[Step, ...]
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -52,6 +60,7 @@ class Job:
     description: str = ""
     artifacts: tuple[str, ...] = ()
     verify: str = ""
+    stage: str = "default"
 
 
 @dataclass(frozen=True)
@@ -63,6 +72,7 @@ class Config:
     directory: Path
     jobs: tuple[Job, ...] = ()
     legacy: bool = False
+    blocks: tuple[StepBlock, ...] = ()
 
     @property
     def execution_jobs(self) -> tuple[Job, ...]:
@@ -124,7 +134,7 @@ def load_config(path: Path) -> Config:
         ) from None
 
     data = mapping(data, "configuration")
-    fields(data, {"name", "values", "secrets", "pipeline", "jobs"}, "configuration")
+    fields(data, {"name", "values", "secrets", "pipeline", "jobs", "blocks"}, "configuration")
     name = text(data.get("name"), "name")
     values = mapping(data.get("values", {}), "values")
     validate_values(values)
@@ -143,6 +153,16 @@ def load_config(path: Path) -> Config:
 
     if ("pipeline" in data) == ("jobs" in data):
         raise ConfigError("Declare either jobs or legacy pipeline, never both.")
+    blocks: dict[str, StepBlock] = {}
+    for key, raw in mapping(data.get("blocks", {}), "blocks").items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", key):
+            raise ConfigError("Block IDs must be identifiers of at most 64 characters.")
+        block = mapping(raw, "block")
+        fields(block, {"description", "steps"}, "block")
+        description = block.get("description", "")
+        if not isinstance(description, str) or "\0" in description:
+            raise ConfigError("Block description must be a string without NUL characters.")
+        blocks[key] = StepBlock(key, parse_steps(block.get("steps"), {}), description)
     jobs: list[Job] = []
     if "pipeline" in data:
         jobs.append(Job("default", parse_steps(data["pipeline"], {}, legacy=True)))
@@ -154,7 +174,11 @@ def load_config(path: Path) -> Config:
             if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", key):
                 raise ConfigError("Job IDs must be identifiers of at most 64 characters.")
             job = mapping(raw, "job")
-            fields(job, {"steps", "needs", "env", "description", "artifacts", "verify"}, "job")
+            fields(
+                job,
+                {"steps", "needs", "env", "description", "artifacts", "verify", "use", "stage"},
+                "job",
+            )
             needs = job.get("needs", [])
             if isinstance(needs, str):
                 needs = [needs]
@@ -182,14 +206,33 @@ def load_config(path: Path) -> Config:
                 verify = text(verify, "verify")
                 if any(prefix in verify for prefix in ("${values.", "${secrets.", "${git.")):
                     raise ConfigError("Use env for references in verify commands.")
+            use = job.get("use", [])
+            if isinstance(use, str):
+                use = [use]
+            if (
+                not isinstance(use, list)
+                or any(not isinstance(item, str) or item not in blocks for item in use)
+                or ("use" in job and not use)
+            ):
+                raise ConfigError("use must name an existing block or a non-empty list of blocks.")
+            expanded = tuple(
+                replace(step, env={**env, **step.env}, block=block_name)
+                for block_name in use
+                for step in blocks[block_name].steps
+            )
+            local = parse_steps(job["steps"], env) if "steps" in job else ()
+            if not expanded and not local:
+                raise ConfigError("A job requires steps or use.")
+            stage = text(job.get("stage", "default"), "stage")
             jobs.append(
                 Job(
                     key,
-                    parse_steps(job.get("steps"), env),
+                    expanded + local,
                     tuple(needs),
                     description,
                     tuple(artifacts),
                     verify,
+                    stage,
                 )
             )
     from pipeforge.graph import ordered_jobs
@@ -203,6 +246,7 @@ def load_config(path: Path) -> Config:
         path.resolve().parent,
         tuple(jobs),
         "pipeline" in data,
+        tuple(blocks.values()),
     )
 
 

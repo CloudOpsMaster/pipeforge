@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+- Add reusable step blocks, ordered job `use`, stage metadata and exact stage reruns.
+- Add stage-aware plans, text/Mermaid/DOT graphs and `exec-job`.
+- Render native GitHub Actions jobs with dependency edges and declared artifact transport.
+- Include block occurrences, stage timing and critical paths in reports; append GitHub summaries automatically.
+- Extend the bootstrap launcher to forward the new commands.
+
 
 - Resume runs from atomic job checkpoints with retained, checksum-verified artifacts.
 - Verify external publication results before retrying attempted jobs.

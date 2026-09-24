@@ -168,3 +168,41 @@ def test_job_key_stable_across_attempts(cli, tmp_path):
     assert len(keys) == 2
     assert len(keys[0]) == 64
     assert keys[0] == keys[1]
+
+
+def test_resume_accepts_pre_blocks_checkpoint_fingerprint(cli, tmp_path):
+    import hashlib
+
+    script = "echo attempt >> calls; test -f ready"
+    config = yaml.safe_dump({"name": "old", "jobs": {"test": {"steps": [{"run": script}]}}})
+    assert cli(config, "run").returncode == 1
+    run_id = report(tmp_path)["resume_id"]
+    checkpoint = tmp_path / ".pipeforge/state" / run_id / "state.json"
+    saved = json.loads(checkpoint.read_text())
+    step = {"name": "Step 1", "script": script, "env": {}, "timeout": 300.0}
+    # Frozen configuration representation used by v0.1 before this feature.
+    old_definition = {
+        "name": "old",
+        "values": {},
+        "secrets": {},
+        "pipeline": [step],
+        "jobs": [
+            {
+                "name": "test",
+                "steps": [step],
+                "needs": [],
+                "description": "",
+                "artifacts": [],
+                "verify": "",
+            }
+        ],
+        "legacy": False,
+    }
+    saved["fingerprint"] = hashlib.sha256(
+        json.dumps(old_definition, sort_keys=True).encode()
+    ).hexdigest()
+    checkpoint.write_text(json.dumps(saved))
+    (tmp_path / "ready").touch()
+    result = cli(config, "run", "--resume", run_id)
+    assert result.returncode == 0, result.stdout
+    assert (tmp_path / "calls").read_text().splitlines() == ["attempt", "attempt"]

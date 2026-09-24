@@ -46,6 +46,18 @@ class RunState:
         try:
             definition = asdict(config)
             definition.pop("directory")
+            # Preserve fingerprints for configurations written before blocks/stages existed.
+            if not definition["blocks"]:
+                definition.pop("blocks")
+            for step in definition["pipeline"]:
+                if not step["block"]:
+                    step.pop("block")
+            for job in definition["jobs"]:
+                if job["stage"] == "default":
+                    job.pop("stage")
+                for step in job["steps"]:
+                    if not step["block"]:
+                        step.pop("block")
             fingerprint = hashlib.sha256(
                 json.dumps(definition, sort_keys=True).encode()
             ).hexdigest()
