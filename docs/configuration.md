@@ -70,7 +70,7 @@ Legacy `pipeline: [{name: ..., script: ...}]` is still accepted as one job named
 
 `--from` skips upstream prerequisites; `--no-needs` skips all prerequisites of the selected job. The execution output states when prerequisites are assumed satisfied. These modes are for deliberate partial reruns and do not restore previous artifacts. `--until` follows dependencies, not YAML line order: unrelated jobs are excluded. Combined `--from/--until` selects the intersection of descendants and ancestors; the end must be reachable from the start. A positional job cannot be combined with these bounds.
 
-The graph is fully validated before selection. Ready jobs use declaration order as a tiebreaker; execution is sequential. Any failed step stops the entire run, and unexecuted jobs are marked skipped. Each step has its own shell; filesystem artifacts persist, but `cd` or environment changes in a step do not carry to another step.
+The graph is fully validated before selection. Ready jobs use declaration order as a tiebreaker. The default is sequential, fail-fast execution. `--max-parallel N` (1–64) bounds concurrent jobs. With N greater than 1, failed jobs skip their dependants while independent branches continue; the overall run fails. Steps inside each job stay sequential. Jobs share a working directory, so concurrent writers must use distinct output files. Cancellation stops all active process groups. Each step has its own shell; filesystem artifacts persist, but `cd` or environment changes in a step do not carry to another step.
 
 `validate`, `--list`, and `--dry-run` do not execute pipeline commands, require real secret values, or create run reports. A first invocation of the launcher still installs its runtime. Dry-run shows dependencies, RUN/SKIPPED state and execution order. It does not display scripts or resolved environment values and does not verify external tools or artifacts.
 
@@ -134,4 +134,4 @@ Run directories and artifact files are private (0700/0600). Each run has a uniqu
 
 The shell's original exit code is recorded; the CLI returns `1` for failed commands. Commands use `/bin/sh -c`: use `set -eu` for fail-fast multiline scripts. Portable `/bin/sh` does not guarantee `pipefail`, so check shell-pipeline failures deliberately.
 
-Not implemented yet: containers, parallel jobs, `--step`, environment overlays, plugins, remote Git modules, Windows execution, `doctor`, `logs`, `explain`, and ForgeAI.
+Not implemented yet: containers, `--step`, environment overlays, plugins, remote Git modules, Windows execution, `doctor`, `logs`, `explain`, and ForgeAI.

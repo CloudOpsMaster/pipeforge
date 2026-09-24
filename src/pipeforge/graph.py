@@ -1,4 +1,4 @@
-"""Stable topological planning and explicit job selection; execution is sequential."""
+"""Stable topological planning and explicit job selection; concurrency is handled by the engine."""
 
 from typing import TYPE_CHECKING
 

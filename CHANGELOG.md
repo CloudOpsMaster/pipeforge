@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Resume runs from atomic job checkpoints with retained, checksum-verified artifacts.
+- Verify external publication results before retrying attempted jobs.
+- Run independent jobs concurrently with `--max-parallel N`, isolate failed branches,
+  and cancel all active process groups together.
+- Record retry attempts, reused jobs, verification results and recovery time in reports.
+
 ## 0.1.0
 
 First public MVP release. Linux/macOS, Python 3.11+, host execution.

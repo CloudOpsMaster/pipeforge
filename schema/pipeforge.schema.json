@@ -60,6 +60,8 @@
       "required": ["steps"],
       "additionalProperties": false,
       "properties": {
+        "artifacts": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "description": "Files relative to PIPEFORGE_ARTIFACTS retained and checked on resume."},
+        "verify": {"$ref": "#/$defs/command", "description": "Check external result: 0 confirmed, 3 definitely absent, other codes uncertain."},
         "description": {"$ref": "#/$defs/string"},
         "needs": {
           "description": "Prerequisite jobs, executed once in dependency order.",

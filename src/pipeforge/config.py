@@ -50,6 +50,8 @@ class Job:
     steps: tuple[Step, ...]
     needs: tuple[str, ...] = ()
     description: str = ""
+    artifacts: tuple[str, ...] = ()
+    verify: str = ""
 
 
 @dataclass(frozen=True)
@@ -152,7 +154,7 @@ def load_config(path: Path) -> Config:
             if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,63}", key):
                 raise ConfigError("Job IDs must be identifiers of at most 64 characters.")
             job = mapping(raw, "job")
-            fields(job, {"steps", "needs", "env", "description"}, "job")
+            fields(job, {"steps", "needs", "env", "description", "artifacts", "verify"}, "job")
             needs = job.get("needs", [])
             if isinstance(needs, str):
                 needs = [needs]
@@ -164,7 +166,32 @@ def load_config(path: Path) -> Config:
             if not isinstance(description, str) or "\0" in description:
                 raise ConfigError("Job description must be a string without NUL characters.")
             env = parse_env(job.get("env", {}))
-            jobs.append(Job(key, parse_steps(job.get("steps"), env), tuple(needs), description))
+            artifacts = job.get("artifacts", [])
+            if not isinstance(artifacts, list) or any(
+                not isinstance(item, str)
+                or not item
+                or "\0" in item
+                or Path(item).is_absolute()
+                or ".." in Path(item).parts
+                or item == "."
+                for item in artifacts
+            ):
+                raise ConfigError("artifacts must list relative file paths without '..'.")
+            verify = job.get("verify", "")
+            if "verify" in job:
+                verify = text(verify, "verify")
+                if any(prefix in verify for prefix in ("${values.", "${secrets.", "${git.")):
+                    raise ConfigError("Use env for references in verify commands.")
+            jobs.append(
+                Job(
+                    key,
+                    parse_steps(job.get("steps"), env),
+                    tuple(needs),
+                    description,
+                    tuple(artifacts),
+                    verify,
+                )
+            )
     from pipeforge.graph import ordered_jobs
 
     ordered_jobs(tuple(jobs))  # Validate the entire graph before any selection or execution.

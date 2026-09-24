@@ -33,6 +33,14 @@ def main(argv: list[str] | None = None) -> int:
         if command == "run":
             child.add_argument("job", nargs="?")
             child.add_argument("--dry-run", action="store_true")
+            child.add_argument("--resume", metavar="RUN_ID")
+            child.add_argument(
+                "--max-parallel",
+                type=int,
+                default=1,
+                metavar="N",
+                help="Run up to N independent jobs concurrently (1–64; default 1)",
+            )
             child.add_argument("--list", action="store_true", dest="list_jobs")
             child.add_argument("-v", "--verbose", action="count", default=0)
             needs = child.add_mutually_exclusive_group()
@@ -66,6 +74,12 @@ def main(argv: list[str] | None = None) -> int:
                     f"{job.name:16} {job.description}  needs: {', '.join(job.needs) or '—'}"
                 )
             return 0
+        if args.resume and (
+            args.dry_run or args.job or args.from_job or args.until_job or not args.with_needs
+        ):
+            raise ConfigError("--resume cannot be combined with planning or job selection.")
+        if not 1 <= args.max_parallel <= 64:
+            raise ConfigError("--max-parallel must be between 1 and 64.")
         selected = select_jobs(
             config.execution_jobs,
             args.job,
@@ -73,7 +87,15 @@ def main(argv: list[str] | None = None) -> int:
             from_job=args.from_job,
             until_job=args.until_job,
         )
-        return run(config, os.environ, logger, dry_run=args.dry_run, selected=selected)
+        return run(
+            config,
+            os.environ,
+            logger,
+            dry_run=args.dry_run,
+            selected=selected,
+            resume=args.resume,
+            max_parallel=args.max_parallel,
+        )
     except ConfigError as error:
         logger.write(f"Configuration error: {error}", failed=True)
         return 2
