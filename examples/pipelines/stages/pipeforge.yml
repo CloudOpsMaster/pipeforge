@@ -1,0 +1,41 @@
+name: staged-build
+blocks:
+  inspect:
+    description: Reusable check before each job
+    steps:
+      - name: Inspect
+        run: python --version
+  inspect-again:
+    description: Same step, a different named block
+    steps:
+      - name: Inspect
+        run: python --version
+jobs:
+  setup:
+    stage: prepare
+    use: inspect
+  generate:
+    stage: build
+    needs: setup
+    use: inspect
+    artifacts:
+      - output/reel.txt
+    steps:
+      - name: Generate example artifact
+        run: |
+          mkdir -p "$PIPEFORGE_ARTIFACTS/output"
+          printf 'example reel\n' > "$PIPEFORGE_ARTIFACTS/output/reel.txt"
+  instagram:
+    stage: publish
+    needs: generate
+    use: [inspect, inspect-again]
+    steps:
+      - name: Simulate Instagram
+        run: cat "$PIPEFORGE_ARTIFACTS/output/reel.txt"
+  facebook:
+    stage: publish
+    needs: generate
+    use: inspect
+    steps:
+      - name: Simulate Facebook
+        run: cat "$PIPEFORGE_ARTIFACTS/output/reel.txt"

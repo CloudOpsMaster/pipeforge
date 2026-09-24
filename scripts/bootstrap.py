@@ -110,7 +110,16 @@ def main() -> int:
         help_only = any(arg in ("--help", "-h", "--version") for arg in arguments)
         config = None if help_only else config_path(arguments, Path.cwd())
         python = prepare_runtime(framework, config.parent if config else Path.cwd())
-        if arguments and arguments[0] in ("validate", "jobs", "--version"):
+        if arguments and arguments[0] in (
+            "validate",
+            "jobs",
+            "run",
+            "plan",
+            "graph",
+            "exec-job",
+            "render",
+            "--version",
+        ):
             cli = arguments
         else:
             cli = ["run", *arguments]

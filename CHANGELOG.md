@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0
+
+- Add reusable step blocks, ordered job `use`, stage metadata and exact stage reruns.
+- Add stage-aware plans, text/Mermaid/DOT graphs and `exec-job`.
+- Render native GitHub Actions jobs with dependency edges and declared artifact transport.
+- Include block occurrences, stage timing and critical paths in reports; append GitHub summaries automatically.
+- Extend the bootstrap launcher to forward the new commands.
+
+
+- Resume runs from atomic job checkpoints with retained, checksum-verified artifacts.
+- Verify external publication results before retrying attempted jobs.
+- Run independent jobs concurrently with `--max-parallel N`, isolate failed branches,
+  and cancel all active process groups together.
+- Record retry attempts, reused jobs, verification results and recovery time in reports.
+
 ## 0.1.0
 
 First public MVP release. Linux/macOS, Python 3.11+, host execution.

@@ -16,9 +16,3 @@ jobs:
           python-version: '3.12'
       - name: Run the same application jobs as locally
         run: ./.pf/run --color always
-      - name: Publish summary
-        if: always()
-        run: |
-          if test -f .pipeforge/latest/summary.md; then
-            cat .pipeforge/latest/summary.md >> "$GITHUB_STEP_SUMMARY"
-          fi

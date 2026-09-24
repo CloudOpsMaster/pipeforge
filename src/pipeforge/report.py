@@ -58,16 +58,35 @@ class RunReport:
             json.dump(clean, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
         with self._open("summary.md") as handle:
-            # HTML pre blocks avoid Markdown link/table injection from names and descriptions.
+            # Escape metadata before inserting it into Markdown or HTML.
             handle.write("# PipeForge\n\n<pre>\n")
             handle.write(
                 html.escape(f"{clean['pipeline']} • {clean['provider']} • {clean['result']}\n")
             )
+            handle.write(f"Total: {duration:.2f}s\n</pre>\n\n")
+            handle.write("| Stage | Job | Result | Duration |\n|---|---|---|---:|\n")
+
+            def cell(value: object) -> str:
+                result = html.escape(str(value)).replace("\n", " ")
+                for char in "|[]()*_`~\\":
+                    result = result.replace(char, f"&#{ord(char)};")
+                return result
+
             for job in clean["jobs"]:
                 handle.write(
-                    html.escape(f"{job['name']}: {job['status']} ({job['duration']:.2f}s)\n")
+                    f"| {cell(job.get('stage', 'default'))} | {cell(job['name'])} | "
+                    f"{cell(job['status'])} | {job['duration']:.2f}s |\n"
                 )
-            handle.write(f"Total: {duration:.2f}s\n</pre>\n")
+            if clean.get("critical_path"):
+                handle.write(
+                    "\nCritical path: "
+                    + " → ".join(cell(name) for name in clean["critical_path"])
+                    + f" ({clean['critical_path_duration']:.2f}s)\n"
+                )
+            if clean.get("graph"):
+                handle.write(
+                    "\n### Execution graph\n\n" + "```mermaid\n" + clean["graph"] + "\n```\n"
+                )
         latest = self.root / "latest"
         if latest.exists() and not latest.is_symlink():
             raise ExecutionError(
