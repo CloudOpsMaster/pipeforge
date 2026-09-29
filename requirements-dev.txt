@@ -6,7 +6,7 @@ jsonschema==4.26.0
 mypy==2.3.1
 pip-audit==2.10.1
 pytest==9.1.1
-ruff==0.16.8
+ruff==0.16.9
 # Replace older runner-provided setuptools before auditing the entire environment.
 setuptools==84.0.0
 twine==7.0.0
