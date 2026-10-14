@@ -11,6 +11,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Event
 
 from pipeforge.errors import ExecutionError
 
@@ -31,9 +32,13 @@ def execute(
     env: dict[str, str],
     timeout: float,
     on_output: Callable[[str], None] | None = None,
+    *,
+    cancelled: Event | None = None,
 ) -> Result:
     if os.name != "posix":
         raise ExecutionError("Shell execution currently requires Linux or macOS.")
+    if cancelled is not None and cancelled.is_set():
+        return Result(1, "", 0.0, "cancelled")
     started = time.monotonic()
     try:
         # The script is explicit code; resolved configuration stays in env, never shell text.
@@ -61,6 +66,9 @@ def execute(
         with selectors.DefaultSelector() as selector:
             selector.register(process.stdout, selectors.EVENT_READ)
             while selector.get_map() or process.poll() is None:
+                if cancelled is not None and cancelled.is_set():
+                    reason = "cancelled"
+                    break
                 remaining = timeout - (time.monotonic() - started)
                 if remaining <= 0:
                     reason = "timeout"
