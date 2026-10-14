@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/CloudOpsMaster/pipeforge/v0.1.0/schema/pipeforge.schema.json",
+  "$id": "https://raw.githubusercontent.com/CloudOpsMaster/pipeforge/v0.2.0/schema/pipeforge.schema.json",
   "title": "PipeForge pipeline",
   "description": "Host-run jobs for PipeForge. Graph cycles, references and duplicate YAML keys are checked by pipeforge validate.",
   "type": "object",
@@ -22,6 +22,11 @@
           "required": {"type": "boolean", "default": true}
         }
       }
+    },
+    "blocks": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/jobName"},
+      "additionalProperties": {"$ref": "#/$defs/block"}
     },
     "jobs": {
       "type": "object",
@@ -55,11 +60,29 @@
       "propertyNames": {"$ref": "#/$defs/envName"},
       "additionalProperties": {"$ref": "#/$defs/string"}
     },
-    "job": {
+    "block": {
       "type": "object",
       "required": ["steps"],
       "additionalProperties": false,
       "properties": {
+        "description": {"$ref": "#/$defs/string"},
+        "steps": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/step"}}
+      }
+    },
+    "job": {
+      "type": "object",
+      "anyOf": [{"required": ["steps"]}, {"required": ["use"]}],
+      "additionalProperties": false,
+      "properties": {
+        "stage": {"$ref": "#/$defs/nonEmpty", "default": "default"},
+        "use": {
+          "oneOf": [
+            {"$ref": "#/$defs/jobName"},
+            {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/jobName"}}
+          ]
+        },
+        "artifacts": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "description": "Files relative to PIPEFORGE_ARTIFACTS retained and checked on resume."},
+        "verify": {"$ref": "#/$defs/command", "description": "Check external result: 0 confirmed, 3 definitely absent, other codes uncertain."},
         "description": {"$ref": "#/$defs/string"},
         "needs": {
           "description": "Prerequisite jobs, executed once in dependency order.",

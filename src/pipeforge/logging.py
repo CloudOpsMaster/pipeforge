@@ -3,6 +3,7 @@
 import os
 import re
 from collections.abc import Iterable
+from threading import Lock
 from typing import TextIO
 
 
@@ -76,6 +77,7 @@ def safe_text(text: str) -> str:
 
 class Logger:
     def __init__(self, stream: TextIO, masker: Masker, *, color: str = "auto", verbosity: int = 0):
+        self.lock = Lock()
         self.stream = stream
         self.masker = masker
         self.color = color == "always" or (
@@ -100,8 +102,9 @@ class Logger:
                 }.get(style, "36")
             )
             clean = f"\033[{code}m{clean}\033[0m"
-        self.stream.write(clean + "\n")
-        self.stream.flush()
+        with self.lock:
+            self.stream.write(clean + "\n")
+            self.stream.flush()
 
     def banner(self, name: str, provider: str, commit: str) -> None:
         self.write("╭─ PipeForge ─────────────────────────────────────╮", style="title")

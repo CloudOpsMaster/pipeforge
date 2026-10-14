@@ -41,8 +41,8 @@ jobs:
 | `description` | Optional text shown by `--list` |
 | `needs` | A job ID or list of IDs; dependencies must exist and be acyclic |
 | Job `env` | String environment values inherited by its steps |
-| `steps` | Required non-empty list |
-| Step `name` | Optional; defaults to `Step 1`, etc.; unique within its job |
+| `steps` | Non-empty list; optional when `use` supplies steps |
+| Step `name` | Optional; defaults to `Step 1`, etc.; unique within each declared steps list; may repeat across blocks |
 | Step `run` | Required non-empty POSIX shell script |
 | Step `env` | Overrides job environment for this step |
 | Step `timeout` | Seconds, `0 < timeout <= 86400`, default 300 |
@@ -70,9 +70,9 @@ Legacy `pipeline: [{name: ..., script: ...}]` is still accepted as one job named
 
 `--from` skips upstream prerequisites; `--no-needs` skips all prerequisites of the selected job. The execution output states when prerequisites are assumed satisfied. These modes are for deliberate partial reruns and do not restore previous artifacts. `--until` follows dependencies, not YAML line order: unrelated jobs are excluded. Combined `--from/--until` selects the intersection of descendants and ancestors; the end must be reachable from the start. A positional job cannot be combined with these bounds.
 
-The graph is fully validated before selection. Ready jobs use declaration order as a tiebreaker; execution is sequential. Any failed step stops the entire run, and unexecuted jobs are marked skipped. Each step has its own shell; filesystem artifacts persist, but `cd` or environment changes in a step do not carry to another step.
+The graph is fully validated before selection. Ready jobs use declaration order as a tiebreaker. The default is sequential, fail-fast execution. `--max-parallel N` (1–64) bounds concurrent jobs. With N greater than 1, failed jobs skip their dependants while independent branches continue; the overall run fails. Steps inside each job stay sequential. Jobs share a working directory, so concurrent writers must use distinct output files. Cancellation stops all active process groups. Each step has its own shell; filesystem artifacts persist, but `cd` or environment changes in a step do not carry to another step.
 
-`validate`, `--list`, and `--dry-run` do not execute pipeline commands, require real secret values, or create run reports. A first invocation of the launcher still installs its runtime. Dry-run shows dependencies, RUN/SKIPPED state and execution order. It does not display scripts or resolved environment values and does not verify external tools or artifacts.
+`validate`, `--list`, and `--dry-run` do not execute pipeline commands, require real secret values, or create run reports. A first invocation of the launcher still installs its runtime. Dry-run shows dependencies, RUN/SKIPPED state and a stage-grouped dependency graph. It does not display scripts or resolved environment values and does not verify external tools or artifacts.
 
 ## Values, environment and secrets
 
@@ -82,7 +82,7 @@ References are expanded only in `values` and job/step `env`. Numbers become text
 
 Current precedence is **step env → job env → inherited process environment**. Required secrets are read from the inherited environment before any step executes. Missing/empty required secrets fail; absent optional secrets become empty. CI credentials are already environment variables, not a separate resolver tier. All declared required secrets must be present for a real run, including a partial run. `.env` is not automatically read.
 
-The launcher prepends its runtime's `bin` directory to PATH so `python` runs the isolated interpreter. It does not install application tools such as Java, Docker or Terraform. Install application dependencies in an explicit setup job. Environment overlays and CLI value overrides are future work; there is no implied generic precedence system for those features yet.
+The launcher prepends its runtime's `bin` directory to PATH so `python` runs the isolated interpreter. It does not install application tools such as Java, Docker or Terraform. Install application dependencies in an explicit setup job locally, or reuse a runtime block in each native CI job. Environment overlays and CLI value overrides are future work; there is no implied generic precedence system for those features yet.
 
 ## Git and CI metadata
 
@@ -134,4 +134,142 @@ Run directories and artifact files are private (0700/0600). Each run has a uniqu
 
 The shell's original exit code is recorded; the CLI returns `1` for failed commands. Commands use `/bin/sh -c`: use `set -eu` for fail-fast multiline scripts. Portable `/bin/sh` does not guarantee `pipefail`, so check shell-pipeline failures deliberately.
 
-Not implemented yet: containers, parallel jobs, `--step`, environment overlays, plugins, remote Git modules, Windows execution, `doctor`, `logs`, `explain`, and ForgeAI.
+Not implemented yet: containers, `--step`, environment overlays, plugins, remote Git modules, Windows execution, `doctor`, `logs`, `explain`, and ForgeAI.
+
+
+## Blocks and stages
+
+`blocks` maps reusable names to `description` and a non-empty `steps` list.
+A job's `use` accepts one block name or a non-empty list. Expansion is ordered:
+all steps from the first block, then the second, then the job's own steps.
+Blocks are expanded before DAG validation; they are never scheduler nodes.
+Nested `use` inside blocks is not supported.
+
+```yaml
+blocks:
+  runtime:
+    description: Prepare Python
+    steps:
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+  checks:
+    steps:
+      - name: Validate
+        run: python validate.py
+  final-checks:
+    steps:
+      - name: Validate
+        run: python validate.py
+
+jobs:
+  build:
+    stage: build
+    use: runtime
+    steps:
+      - run: python build.py
+  publish:
+    stage: publish
+    needs: build
+    use: [runtime, checks, final-checks]
+    steps:
+      - run: python publish.py
+```
+
+Identical steps and names in different blocks are allowed. A block may be used
+in multiple jobs, or repeated in one `use` list: each occurrence executes.
+Reports distinguish occurrences with a one-based step `index` and source `block`.
+Block step environment overrides the consuming job environment; each expansion
+has its own environment mapping.
+
+`stage` is a non-empty label, defaulting to `default`. It affects presentation
+and selection only. It never adds dependencies, barriers or ordering. `needs`
+remains the single source of execution dependencies.
+
+```sh
+pipeforge run --stage publish --max-parallel 2
+pipeforge run --stage publish --with-needs --max-parallel 2
+pipeforge exec-job publish
+pipeforge plan --stage publish
+pipeforge graph
+pipeforge graph --format mermaid
+pipeforge graph --format dot
+```
+
+Stage selection runs only that stage by default; dependencies between selected
+jobs are still respected. External prerequisites are assumed satisfied.
+`--with-needs` adds transitive prerequisites. Unknown stages are errors.
+Stage selection cannot be combined with a positional job, `--from`, `--until`
+or `--resume`. `exec-job JOB` is the exact-job equivalent of `run JOB --no-needs`.
+
+Running a stage again creates a fresh run and executes its steps again, including
+publication commands. Use existing `--resume RUN_ID` for checkpoint-aware
+recovery that reuses completed jobs and preserves idempotency keys.
+
+Stage reruns do not implicitly restore old artifact directories. To reuse saved
+inputs from excluded ancestors, provide them explicitly:
+
+```sh
+pipeforge run --stage publish --artifact-input .pipeforge/state/RUN_ID/artifacts
+```
+
+## Native GitHub Actions
+
+```sh
+pipeforge render github -o .github/workflows/pipeline.yml
+# In the PipeForge repository itself:
+pipeforge render github --launcher ./run -o /tmp/pipeforge-native.yml
+```
+
+The default launcher is `.pf/run`; pin that submodule to a revision containing
+these commands. The renderer creates a manually triggered workflow with one
+Ubuntu job per PipeForge job, stage/job display names, and native `needs` edges.
+Checkout initializes submodules, Python is prepared on every runner, and only
+`exec-job JOB` executes. Declared secrets map to same-named GitHub secrets.
+The renderer never reads secret values or executes pipeline commands.
+Commit the generated workflow to use it; regenerate it when dependencies change.
+Add application-specific triggers, inputs and environment variables to the
+generated workflow as needed; rendering again replaces that file.
+
+Each GitHub job has a fresh runner. Runtime installations and arbitrary workspace
+files do not transfer. Put required runtime blocks in every consuming job's
+`use`. GitHub displays parallel branches automatically; runner availability
+and account concurrency determine when they start. Local `--max-parallel`
+does not constrain native GitHub jobs.
+
+Artifact paths keep the existing contract: files relative to
+`$PIPEFORGE_ARTIFACTS`, not the checkout. A producer writes there and declares
+the same relative file paths in `artifacts`. The renderer exports only those
+files, uploads them with their nested paths, downloads artifacts from all
+transitive ancestors, and imports them into each consuming run's artifact
+directory. Files need not be redeclared by intermediate jobs.
+Conflicting ancestor paths are rejected instead of silently overwriting data.
+Transport directories are under the configuration directory's
+`.pipeforge/github/`. Only declared exports, including declared hidden files,
+are uploaded; runtime caches, secrets and checkpoint state are not exported.
+Uploads replace the same artifact name on a GitHub job rerun.
+
+`--artifact-input DIR` imports declared files from excluded ancestors before
+execution. Missing or escaping paths fail. `--artifact-output DIR` exports
+selected jobs' declared outputs after success; the output directory must be
+new. These flags cannot be combined with `--resume`. Native GitHub reruns are
+fresh executions, not checkpoint resumes; publication adapters should make
+repeated publication safe when that behavior is required.
+
+The artifact transport uses GitHub's documented
+[upload](https://github.com/actions/upload-artifact) and
+[download](https://github.com/actions/download-artifact) actions.
+The generated workflow targets GitHub.com, not GitHub Enterprise Server.
+
+## Stage timing and summaries
+
+Reports include stage membership and elapsed stage spans, per-job stage labels,
+step/block occurrence metadata, the weighted `critical_path`, its duration,
+and `parallel_time_saved`. The critical path is the longest dependency path
+using measured job durations for this attempt, excluding skipped/reused jobs.
+Saved time is summed job duration minus wall time, bounded below by zero;
+stage spans can overlap because stages do not impose barriers.
+
+When `GITHUB_STEP_SUMMARY` is present, PipeForge automatically appends its redacted
+summary with stage/job results and a Mermaid graph, including failed runs.
+A wrapper should not append the same summary a second time. Each native job
+reports its own execution; a single full-DAG run reports the full attempt.
