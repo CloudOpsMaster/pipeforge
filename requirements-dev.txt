@@ -10,4 +10,4 @@ ruff==0.17.0
 # Replace older runner-provided setuptools before auditing the entire environment.
 setuptools==84.0.0
 twine==7.0.0
-types-PyYAML==6.0.12.20260906
+types-PyYAML==6.0.12.20261030
