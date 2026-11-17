@@ -42,7 +42,7 @@ def test_logger_masks_and_neutralizes_terminal_and_workflow_commands():
         (["abc", "cde"], "abcde"),
         (["aa"], "aaaaa"),
         (["one\ntwo"], "one\ntwo complete!"),
-        (["🔐пароль"], "hello 🔐пароль done"),
+        (["🔐pássword"], "hello 🔐pássword done"),
     ],
 )
 def test_every_stream_chunk_boundary_masks_secrets(values, text):
