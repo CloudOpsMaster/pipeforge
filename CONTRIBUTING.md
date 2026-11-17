@@ -36,6 +36,10 @@ These are the same checks used by CI. `ruff format .` applies formatting. Tests 
 
 Run an example with `./run -vv -f examples/pipelines/basic/pipeforge.yml`. Keep runtime dependencies small. Add unit tests under `tests/unit` and subprocess-based CLI tests under `tests/integration`; use temporary directories and fake credentials. Every pipeline example is schema-validated; basic/Python examples execute under all supported provider flags. Real bootstrap installation is checked separately by the Build job.
 
+## Project language
+
+Use English for documentation, code comments, CLI messages, examples, and pull request descriptions. Unicode test data is welcome when it exercises encoding or secret masking.
+
 ## Propose a change
 
 For a substantial feature or new integration, open a feature issue first to agree on scope. Small documentation and bug fixes can go straight to a pull request. One PR should solve one problem.

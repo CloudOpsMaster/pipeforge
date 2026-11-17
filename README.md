@@ -83,7 +83,7 @@ Successful command output stays in per-job logs. Failures automatically show a b
 
 - [Configuration and command reference](docs/configuration.md)
 - [Contributing and exact CI checks](CONTRIBUTING.md)
-- [Development plan — українською](docs/development-plan.md)
+- [Development plan](docs/development-plan.md)
 - [Security policy](SECURITY.md)
 
 CI runs on pushes to `dev`/`main` and on PRs: **Lint**, **Tests**, **Security**, **Build**. Contributors propose PRs; the maintainer reviews and squash-merges. GitHub required-check enforcement is configured separately.
