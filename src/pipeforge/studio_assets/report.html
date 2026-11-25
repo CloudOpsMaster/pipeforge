@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>PipeForge Studio</title>
+<style>
+/*TOKENS*/
+* { box-sizing: border-box }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px system-ui }
+main { max-width: 1150px; margin: auto; padding: 32px clamp(14px, 4vw, 44px) }
+header, nav, #camera { display: flex; flex-wrap: wrap; align-items: center; gap: 12px }
+header { justify-content: space-between; margin-bottom: 18px }
+h1 { margin: 0; font-size: 28px }
+h2 { margin: 0 0 12px; font-size: 20px }
+button, select { font: inherit; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px }
+button { cursor: pointer }
+button[aria-pressed=true] { border-color: #c4b5fd; background: #332759 }
+section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 14px }
+#viewport { overflow: auto; max-height: 55vh; background: #0b1220; border-radius: 8px }
+#diagram { position: relative; width: max(100%, var(--diagram-width, 600px)) }
+#neural-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+svg { position: relative; width: 100%; min-width: 600px; display: block }
+svg g[tabindex] { cursor: pointer }
+svg g:focus { outline: none; filter: drop-shadow(0 0 4px white) }
+@keyframes rotate-status { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: no-preference) {
+  .running-symbol { transform-box: fill-box; transform-origin: center; animation: rotate-status 2s linear infinite }
+}
+#camera { padding-top: 12px }
+#camera[hidden] { display: none }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1220; padding: 12px; border-radius: 8px }
+p { color: var(--muted); overflow-wrap: anywhere }
+</style>
+<main>
+<header>
+  <h1>PipeForge Studio</h1>
+  <label>Status <select id="filter"><option value="">All</option></select></label>
+</header>
+<nav aria-label="Views">
+  <button data-mode="dag" aria-pressed="true">Blue Ocean</button>
+  <button data-mode="neural" aria-pressed="false">Neural 3D</button>
+  <button data-mode="timeline" aria-pressed="false">Timeline</button>
+</nav>
+<p id="summary"></p>
+<section>
+  <div id="viewport"><div id="diagram">
+    <canvas id="neural-layer" aria-hidden="true" hidden></canvas>
+    <svg id="graph" aria-label="Rule execution graph"></svg>
+  </div></div>
+  <div id="camera" hidden>
+    <label>Rotation <input id="angle" type="range" min="-180" max="180" value="22"></label>
+    <label>Tilt <input id="tilt" type="range" min="-60" max="60" value="12"></label>
+  </div>
+</section>
+<section aria-live="polite">
+  <h2 id="heading"></h2>
+  <p id="metadata"></p>
+  <p id="impact"></p>
+  <pre id="logs" hidden></pre>
+</section>
+</main>
+<script id="journal" type="application/json">/*EVENTS*/</script>
+<script>
+/*NEURAL*/
+const byId = id => document.getElementById(id);
+const namespace = 'http://www.w3.org/2000/svg';
+const neuralLayer = byId('neural-layer');
+let paintNeural;
+const colors = {success:'#4ade80', failed:'#fb7185', running:'#38bdf8', blocked:'#94a3b8',
+  pending:'#cbd5e1', cancelled:'#fbbf24', skipped:'#94a3b8', warning:'#fbbf24', approval:'#fb923c'};
+const symbols = {success:'✓', failed:'×', running:'↻', blocked:'–', pending:'·',
+  cancelled:'⊘', skipped:'↷', warning:'!', approval:'?'};
+const events = JSON.parse(byId('journal').textContent);
+const starts = new Map(), latest = new Map();
+for (const event of events) {
+  if (event.status === 'running') starts.set(event.node_id, Date.parse(event.timestamp));
+  latest.set(event.node_id, event);
+}
+const nodes = [...latest.values()];
+const origin = Math.min(...starts.values(), Date.parse(events[0].timestamp));
+const total = Math.max(1, ...events.map(event => Date.parse(event.timestamp) - origin));
+const dependencies = node => Array.isArray(node.dependencies) ? node.dependencies : [];
+const parents = new Map();
+for (const node of nodes) {
+  for (const id of Array.isArray(node.children) ? node.children : []) parents.set(id, node.node_id);
+}
+const upstream = node => dependencies(node).length ? dependencies(node) :
+  (parents.has(node.node_id) ? [parents.get(node.node_id)] : []);
+const depths = new Map();
+for (const node of nodes) {
+  depths.set(node.node_id, Math.max(-1, ...upstream(node).map(id => depths.get(id) ?? -1)) + 1);
+}
+const failures = nodes.filter(node => node.status === 'failed' && node.kind !== 'group');
+const initialView = new URLSearchParams(location.search).get('view');
+let selected = failures[0] || nodes[0];
+let mode = ['dag', 'neural', 'timeline'].includes(initialView) ? initialView : 'dag';
+for (const status of Object.keys(colors)) byId('filter').add(new Option(status, status));
+function draw(tag, attributes, value = '') {
+  const element = document.createElementNS(namespace, tag);
+  for (const [key, entry] of Object.entries(attributes)) element.setAttribute(key, entry);
+  if (value) element.textContent = value;
+  return element;
+}
+function renderDetails() {
+  byId('heading').textContent = selected.rule + ' · ' + selected.status;
+  const source = selected.source || {};
+  byId('metadata').textContent = [
+    source.file ? source.file + ':' + source.line : '',
+    Number.isInteger(selected.duration_ms) ? selected.duration_ms + ' ms' : '',
+    Number.isInteger(selected.exit_code) ? 'Exit ' + selected.exit_code : '',
+    dependencies(selected).length ? 'Needs ' + dependencies(selected).join(', ') : '',
+    Array.isArray(selected.artifacts) ? 'Artifacts ' + selected.artifacts.join(', ') : '',
+  ].filter(Boolean).join(' · ');
+  const visited = new Set([selected.node_id]);
+  let previous = 0;
+  while (previous !== visited.size) {
+    previous = visited.size;
+    for (const node of nodes) {
+      const children = node.status === 'failed' && Array.isArray(node.children) ? node.children : [];
+      if ([...dependencies(node), ...children].some(id => visited.has(id))) visited.add(node.node_id);
+    }
+  }
+  const blocked = nodes.filter(node => visited.has(node.node_id) && node.status === 'blocked');
+  byId('impact').textContent = blocked.length ? 'Blocked downstream: ' + blocked.map(node => node.rule).join(', ') : '';
+  byId('logs').textContent = selected.message || '';
+  byId('logs').hidden = !selected.message;
+}
+function render(focus = false) {
+  const graph = byId('graph'), status = byId('filter').value;
+  const visible = nodes.filter(node => !status || node.status === status);
+  if (visible.length && !visible.includes(selected)) selected = visible[0];
+  const layers = new Map();
+  for (const node of visible) {
+    const depth = depths.get(node.node_id);
+    if (!layers.has(depth)) layers.set(depth, []);
+    layers.get(depth).push(node.node_id);
+  }
+  const columns = [...layers.keys()].sort((a, b) => a - b);
+  const width = mode === 'timeline' ? 1000 : Math.max(1000, columns.length * 188);
+  const height = mode === 'timeline' ? Math.max(120, visible.length * 38 + 50) :
+    Math.max(288, ...[...layers.values()].map(layer => layer.length * 110 + 50));
+  graph.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+  byId('diagram').style.setProperty('--diagram-width', Math.max(600, width * 0.8) + 'px');
+  graph.replaceChildren();
+  const positions = new Map();
+  const angle = Number(byId('angle').value) * Math.PI / 180;
+  const tilt = Number(byId('tilt').value) * Math.PI / 180;
+  visible.forEach((node, index) => {
+    const column = depths.get(node.node_id), layer = layers.get(column);
+    const middle = width / 2;
+    let x = (columns.indexOf(column) + .5) * width / columns.length;
+    let y = (layer.indexOf(node.node_id) + .44) * height / layer.length, depth = 0;
+    if (mode === 'neural') {
+      const z = 130 * Math.sin(index * 2.4);
+      const u = (x - middle) * Math.cos(angle) + z * Math.sin(angle);
+      const v = -(x - middle) * Math.sin(angle) + z * Math.cos(angle);
+      const w = (y - height / 2) * Math.cos(tilt) - v * Math.sin(tilt);
+      depth = (y - height / 2) * Math.sin(tilt) + v * Math.cos(tilt);
+      const distance = Math.max(1200, height, width);
+      const scale = distance / (distance + depth);
+      [x, y] = [middle + u * scale, height / 2 + w * scale];
+    }
+    positions.set(node.node_id, {x, y, depth, index});
+  });
+  const distance = Math.max(1200, height, width);
+  const radiusOf = depth => 24 * distance / (distance + depth);
+  if (mode !== 'timeline') {
+    for (const node of visible) for (const id of upstream(node)) {
+      const a = positions.get(id), b = positions.get(node.node_id);
+      if (!a) continue;
+      const middle = (a.x + b.x) / 2;
+      const turn = Math.sign(b.x - a.x);
+      const trim = point => Math.min(Math.abs(b.x - a.x) / 2, radiusOf(point.depth));
+      const from = a.x + turn * trim(a), to = b.x - turn * trim(b);
+      graph.append(draw('path', {d:'M' + from + ' ' + a.y + ' C' + middle + ' ' + a.y +
+        ' ' + middle + ' ' + b.y + ' ' + to + ' ' + b.y, fill:'none',
+        stroke:colors[node.status], 'stroke-width':2, 'stroke-dasharray':node.status === 'blocked' ? '6 5' : 'none'}));
+    }
+  }
+  const ordered = mode === 'neural' ? [...visible].sort((a, b) =>
+    positions.get(b.node_id).depth - positions.get(a.node_id).depth) : visible;
+  const bodyColor = node => node.kind === 'group' ? '#443573' : '#19405b';
+  let usingWebGL = false;
+  if (mode === 'neural') {
+    if (paintNeural === undefined) paintNeural = createNeuralRenderer(neuralLayer);
+    if (paintNeural) {
+      const bounds = graph.getBoundingClientRect();
+      const points = ordered.filter(node => node.status !== 'blocked').map(node => {
+        const {x, y, depth} = positions.get(node.node_id);
+        return {x, y, radius:radiusOf(depth) + 2, ring:colors[node.status], body:bodyColor(node)};
+      });
+      usingWebGL = paintNeural(points, width, height, bounds.width, bounds.height);
+    }
+  }
+  neuralLayer.hidden = !usingWebGL;
+  for (const node of ordered) {
+    const {x, y, depth, index} = positions.get(node.node_id), color = colors[node.status];
+    const group = draw('g', {tabindex:0, role:'button', 'aria-label':node.rule + ' ' + node.status,
+      'aria-pressed':String(node === selected)});
+    group.append(draw('title', {}, node.rule + ' · ' + node.node_id));
+    const label = node.rule.length > 23 ? node.rule.slice(0, 21) + '…' : node.rule;
+    if (mode === 'timeline') {
+      const row = 28 + index * 38;
+      const start = starts.get(node.node_id) ?? Date.parse(node.timestamp);
+      const duration = node.duration_ms ?? (starts.has(node.node_id) ? Date.parse(node.timestamp) - start : 0);
+      group.append(draw('text', {x:16, y:row + 15, fill:'#e2e8f0'}, label),
+        draw('rect', {x:285 + 550 * (start - origin) / total, y:row,
+          width:Math.max(4, 550 * duration / total), height:20, rx:5, fill:color}),
+        draw('text', {x:980, y:row + 15, fill:color, 'text-anchor':'end'}, node.status));
+    } else {
+      const radius = mode === 'neural' ? radiusOf(depth) : 24;
+      const painted = usingWebGL && node.status !== 'blocked';
+      group.append(draw('circle', {cx:x, cy:y, r:radius,
+        stroke:painted ? 'none' : color, 'stroke-width':4,
+        'stroke-dasharray':node.status === 'blocked' ? '5 4' : 'none',
+        fill:painted ? 'transparent' : bodyColor(node)}),
+        draw('text', {x, y:y + 6, fill:'#fff', 'text-anchor':'middle', 'font-size':21,
+          class:node.status === 'running' ? 'running-symbol' : ''}, symbols[node.status]),
+        draw('text', {x, y:y + 43, fill:'#e2e8f0', 'text-anchor':'middle'}, label));
+    }
+    const choose = () => { selected = node; render(true); };
+    group.addEventListener('click', choose);
+    group.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); }
+    });
+    graph.append(group);
+    if (focus && node === selected) group.focus();
+  }
+  byId('camera').hidden = mode !== 'neural';
+  byId('summary').textContent = visible.length + ' of ' + nodes.length + ' nodes' +
+    (failures.length ? ' · Failed commands: ' + failures.map(node => node.rule).join(', ') : '');
+  renderDetails();
+}
+const tabs = document.querySelectorAll('[data-mode]');
+for (const button of tabs) {
+  button.setAttribute('aria-pressed', String(mode === button.dataset.mode));
+  button.onclick = () => {
+    mode = button.dataset.mode;
+    for (const tab of tabs) tab.setAttribute('aria-pressed', String(tab === button));
+    render();
+  };
+}
+window.addEventListener('resize', () => { if (mode === 'neural') render(); });
+for (const id of ['filter','angle','tilt']) byId(id).addEventListener('input', () => render());
+render();
+</script>
+</html>

@@ -1,0 +1,8 @@
+pipeline {
+  agent { label 'pipeforge' }
+  stages {
+    stage('PipeForge') {
+      steps { sh 'pipeforge demo.report --file examples/rules/portable.yml' }
+    }
+  }
+}

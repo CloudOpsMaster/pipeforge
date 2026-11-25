@@ -19,3 +19,9 @@ The current runner rejects unsafe YAML tags, duplicate keys, aliases, unknown fi
 Logs, JSON reports and Markdown summaries are redacted; scripts and resolved environment maps are never recorded. Keep `.pipeforge/` gitignored. Runs are private directories with private artifact files; inspect redacted logs before sharing. The launcher installs the local framework and pinned runtime dependencies into an isolated virtualenv, with a source/Python fingerprint and a lock to avoid concurrent installation. The first bootstrap requires package-index access. A pinned submodule is trusted executable code, not a sandbox or a provenance guarantee.
 
 Security-related changes need regression tests and maintainer review. Module loading is not implemented yet; the Git-module requirement above applies to future work.
+
+## Versioned rules and Studio
+
+Versioned rules execute trusted repository code on the host. Use reviewed configuration and a dedicated runner with scoped credentials. Rule inputs stay in argument tokens or environment variables. A tool that interprets arguments as commands still needs application-level validation. Keep Studio reports restricted to the run's intended audience because literal masking cannot detect transformed secrets.
+
+See [the portable rules threat model](docs/pipeforge-threat-model.md) and [runner compatibility](docs/portable-rules.md).

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/CloudOpsMaster/pipeforge/v0.2.1/schema/pipeforge.schema.json",
+  "$id": "https://raw.githubusercontent.com/CloudOpsMaster/pipeforge/v0.3.0/schema/pipeforge.schema.json",
   "title": "PipeForge pipeline",
   "description": "Host-run jobs for PipeForge. Graph cycles, references and duplicate YAML keys are checked by pipeforge validate.",
   "type": "object",

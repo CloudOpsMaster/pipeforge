@@ -4,7 +4,7 @@
 
 One `pipeforge.yml` owns your jobs and dependencies. Run the same job locally, in Jenkins, GitLab CI, or GitHub Actions. CI supplies the runner and credentials; PipeForge owns the build logic.
 
-**Latest release [`v0.2.1`](https://github.com/CloudOpsMaster/pipeforge/releases/tag/v0.2.1).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work.
+**Latest release [`v0.3.0`](https://github.com/CloudOpsMaster/pipeforge/releases/tag/v0.3.0).** Linux/macOS, Python 3.11+. Jobs execute on the host; identical tool versions are still your responsibility. Container execution and native modules are future work.
 
 ## Add to an application
 
@@ -12,7 +12,7 @@ Pin the framework to a released version:
 
 ```sh
 git submodule add https://github.com/CloudOpsMaster/pipeforge.git .pf
-git -C .pf checkout v0.2.1
+git -C .pf checkout v0.3.0
 printf '.pipeforge/\n' >> .gitignore
 ```
 
@@ -47,6 +47,10 @@ Then run:
 ```
 
 No manual `pip install` or virtualenv activation. The launcher prepares an isolated, cached runtime on first use; Python with `venv` support and package-index access are required. Warm runs reuse the runtime. `.pf/` is the framework; `.pipeforge/` holds application runtime, cache, logs, and reports.
+
+## Versioned rules
+
+The installed CLI also accepts named rules such as `pipeforge docker.build`. See the [portable rules guide](docs/portable-rules.md) for configuration, migration, CI wrappers and Studio.
 
 ## Output
 

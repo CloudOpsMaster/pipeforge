@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pipeforge"
-version = "0.2.1"
+version = "0.3.0"
 description = "Run small, reusable pipelines locally and on CI runners."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,6 +35,8 @@ packages = ["src/pipeforge"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "schema/pipeforge.schema.json" = "pipeforge/pipeforge.schema.json"
+"schema/event.schema.json" = "pipeforge/event.schema.json"
+"schema/rules.schema.json" = "pipeforge/rules.schema.json"
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "examples", "docs", "scripts", "schema", "run", "pipeforge.yml", "requirements-runtime.txt", "requirements-dev.txt", "pyproject.toml", "README.md", "CONTRIBUTING.md", "SECURITY.md", "CHANGELOG.md", "LICENSE"]

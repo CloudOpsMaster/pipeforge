@@ -1,0 +1,15 @@
+name: PipeForge
+'on':
+  workflow_dispatch: {}
+permissions:
+  contents: read
+jobs:
+  pipeforge:
+    runs-on:
+    - self-hosted
+    - pipeforge
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        persist-credentials: false
+    - run: pipeforge demo.report --file examples/rules/portable.yml

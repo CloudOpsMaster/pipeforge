@@ -27,7 +27,7 @@ class Result:
 
 
 def execute(
-    script: str,
+    script: str | tuple[str, ...],
     directory: Path,
     env: dict[str, str],
     timeout: float,
@@ -43,7 +43,7 @@ def execute(
     try:
         # The script is explicit code; resolved configuration stays in env, never shell text.
         process = subprocess.Popen(  # nosec B603
-            ["/bin/sh", "-c", script],
+            ["/bin/sh", "-c", script] if isinstance(script, str) else script,
             cwd=directory,
             env=env,
             stdin=subprocess.DEVNULL,
@@ -52,8 +52,9 @@ def execute(
             start_new_session=True,
         )
     except (OSError, ValueError):
+        kind = "shell" if isinstance(script, str) else "command"
         raise ExecutionError(
-            "Cannot start shell; check the working directory and environment."
+            f"Cannot start {kind}; check the working directory and environment."
         ) from None
     output = bytearray()
     size = 0

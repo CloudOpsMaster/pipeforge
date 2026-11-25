@@ -1,0 +1,18 @@
+version: 1
+vars:
+  image: example/app:local
+docker:
+  build:
+    argv: [docker, build, -t, 'example/app:local', '.']
+security:
+  trivy:
+    argv: [trivy, image, --severity, 'HIGH,CRITICAL', --exit-code, '1', 'example/app:local']
+  gitleaks:
+    argv: [gitleaks, detect, --source, '.']
+release:
+  validate:
+    steps:
+      - use: docker.build
+      - parallel:
+          - use: security.trivy
+          - use: security.gitleaks
