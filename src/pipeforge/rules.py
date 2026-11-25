@@ -13,7 +13,7 @@ from pipeforge.errors import ConfigError
 
 LEGACY = frozenset({"run", "jobs", "plan", "graph", "exec-job", "render", "validate"})
 RULE_COMMANDS = frozenset(
-    {"list", "explain", "completion", "export", "import", "studio", "promote"}
+    {"list", "explain", "completion", "export", "import", "studio", "promote", "mcp", "observe"}
 )
 FORMS = frozenset({"run", "script", "argv", "steps"})
 METADATA = frozenset({"version", "include", "vars", "secrets"})

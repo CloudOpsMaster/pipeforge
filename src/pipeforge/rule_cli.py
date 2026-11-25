@@ -8,7 +8,7 @@ from pathlib import Path
 from pipeforge.config import read_yaml
 from pipeforge.errors import ConfigError
 from pipeforge.logging import safe_text
-from pipeforge.rule_ci import export, inspect_wrapper
+from pipeforge.rule_ci import export, import_native, inspect_wrapper
 from pipeforge.rule_runtime import RuleRuntime, nodes, write_events
 from pipeforge.rules import LEGACY, RULE_COMMANDS, discover, discover_file, get_rule, load_rules
 
@@ -43,6 +43,15 @@ def dispatch(argv: list[str]) -> int | None:
     elif command == "import":
         parser.add_argument("provider", choices=("github", "gitlab", "jenkins"))
         parser.add_argument("workflow", type=Path)
+        mode = parser.add_mutually_exclusive_group()
+        mode.add_argument("--standalone-rule", metavar="RULE")
+        mode.add_argument("--native", action="store_true")
+    elif command == "mcp":
+        parser.add_argument("events", type=Path)
+    elif command == "observe":
+        parser.add_argument("snapshot", type=Path)
+        parser.add_argument("--desired-digest", required=True)
+        parser.add_argument("--observed-digest")
     elif command == "promote":
         parser.add_argument("manifest", type=Path)
         parser.add_argument("--container", required=True)
@@ -59,6 +68,26 @@ def dispatch(argv: list[str]) -> int | None:
         parser.add_argument("--events", type=Path)
 
     args = parser.parse_args(argv[1:])
+    if command == "import" and args.native:
+        print(json.dumps(import_native(args.provider, args.workflow), indent=2))
+        return 0
+    if command == "mcp":
+        from pipeforge.rule_mcp import serve
+
+        try:
+            serve(args.events)
+        except ConfigError as error:
+            print(safe_text(str(error)), file=sys.stderr)
+            return 2
+        except OSError:
+            print("Cannot read the journal or use MCP stdio.", file=sys.stderr)
+            return 1
+        return 0
+    if command == "observe":
+        from pipeforge.gitops import observe
+
+        print(json.dumps(observe(args.snapshot, args.desired_digest, args.observed_digest)))
+        return 0
     if command == "promote":
         from pipeforge.gitops import draft
 
@@ -105,7 +134,11 @@ def dispatch(argv: list[str]) -> int | None:
         else:
             print(f"_pipeforge() {{ compadd -- {choices}; }}\ncompdef _pipeforge pipeforge")
     elif command == "import":
-        print(json.dumps(inspect_wrapper(spec, file, args.provider, args.workflow)))
+        print(
+            json.dumps(
+                inspect_wrapper(spec, file, args.provider, args.workflow, args.standalone_rule)
+            )
+        )
     elif command == "export":
         content = export(spec, file, args.rule, args.provider, args.mode)
         if args.output:

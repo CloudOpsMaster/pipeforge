@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Define once. Run anywhere. Debug locally.",
         epilog=(
             "Rule commands: <rule.name>, list, explain, completion, export, import, "
-            "studio, promote. Use COMMAND --help for options."
+            "studio, promote, observe, mcp. Use COMMAND --help for options."
         ),
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")

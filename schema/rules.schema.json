@@ -14,7 +14,7 @@
         "secrets": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}}
       },
       "patternProperties": {
-        "^(?!(version|include|vars|secrets|name|values|pipeline|blocks|run|jobs|plan|graph|exec-job|render|validate|list|explain|completion|export|import|studio|promote)$)[A-Za-z_][A-Za-z0-9_-]{0,63}$": {
+        "^(?!(version|include|vars|secrets|name|values|pipeline|blocks|run|jobs|plan|graph|exec-job|render|validate|list|explain|completion|export|import|studio|promote|mcp|observe)$)[A-Za-z_][A-Za-z0-9_-]{0,63}$": {
           "$ref": "#/$defs/branch"
         }
       },

@@ -18,9 +18,15 @@ button { cursor: pointer }
 button[aria-pressed=true] { border-color: #c4b5fd; background: #332759 }
 section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 14px }
 #viewport { overflow: auto; max-height: 55vh; background: #0b1220; border-radius: 8px }
-svg { width: 100%; min-width: 600px; display: block }
+#diagram { position: relative; width: max(100%, var(--diagram-width, 600px)) }
+#neural-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none }
+svg { position: relative; width: 100%; min-width: 600px; display: block }
 svg g[tabindex] { cursor: pointer }
 svg g:focus { outline: none; filter: drop-shadow(0 0 4px white) }
+@keyframes rotate-status { to { transform: rotate(360deg) } }
+@media (prefers-reduced-motion: no-preference) {
+  .running-symbol { transform-box: fill-box; transform-origin: center; animation: rotate-status 2s linear infinite }
+}
 #camera { padding-top: 12px }
 #camera[hidden] { display: none }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1220; padding: 12px; border-radius: 8px }
@@ -38,7 +44,10 @@ p { color: var(--muted); overflow-wrap: anywhere }
 </nav>
 <p id="summary"></p>
 <section>
-  <div id="viewport"><svg id="graph" aria-label="Rule execution graph"></svg></div>
+  <div id="viewport"><div id="diagram">
+    <canvas id="neural-layer" aria-hidden="true" hidden></canvas>
+    <svg id="graph" aria-label="Rule execution graph"></svg>
+  </div></div>
   <div id="camera" hidden>
     <label>Rotation <input id="angle" type="range" min="-180" max="180" value="22"></label>
     <label>Tilt <input id="tilt" type="range" min="-60" max="60" value="12"></label>
@@ -53,8 +62,11 @@ p { color: var(--muted); overflow-wrap: anywhere }
 </main>
 <script id="journal" type="application/json">/*EVENTS*/</script>
 <script>
+/*NEURAL*/
 const byId = id => document.getElementById(id);
 const namespace = 'http://www.w3.org/2000/svg';
+const neuralLayer = byId('neural-layer');
+let paintNeural;
 const colors = {success:'#4ade80', failed:'#fb7185', running:'#38bdf8', blocked:'#94a3b8',
   pending:'#cbd5e1', cancelled:'#fbbf24', skipped:'#94a3b8', warning:'#fbbf24', approval:'#fb923c'};
 const symbols = {success:'✓', failed:'×', running:'↻', blocked:'–', pending:'·',
@@ -129,7 +141,7 @@ function render(focus = false) {
   const height = mode === 'timeline' ? Math.max(120, visible.length * 38 + 50) :
     Math.max(288, ...[...layers.values()].map(layer => layer.length * 110 + 50));
   graph.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
-  graph.style.minWidth = Math.max(600, width * 0.8) + 'px';
+  byId('diagram').style.setProperty('--diagram-width', Math.max(600, width * 0.8) + 'px');
   graph.replaceChildren();
   const positions = new Map();
   const angle = Number(byId('angle').value) * Math.PI / 180;
@@ -151,18 +163,37 @@ function render(focus = false) {
     }
     positions.set(node.node_id, {x, y, depth, index});
   });
+  const distance = Math.max(1200, height, width);
+  const radiusOf = depth => 24 * distance / (distance + depth);
   if (mode !== 'timeline') {
     for (const node of visible) for (const id of upstream(node)) {
       const a = positions.get(id), b = positions.get(node.node_id);
       if (!a) continue;
       const middle = (a.x + b.x) / 2;
-      graph.append(draw('path', {d:'M' + a.x + ' ' + a.y + ' C' + middle + ' ' + a.y +
-        ' ' + middle + ' ' + b.y + ' ' + b.x + ' ' + b.y, fill:'none',
+      const turn = Math.sign(b.x - a.x);
+      const trim = point => Math.min(Math.abs(b.x - a.x) / 2, radiusOf(point.depth));
+      const from = a.x + turn * trim(a), to = b.x - turn * trim(b);
+      graph.append(draw('path', {d:'M' + from + ' ' + a.y + ' C' + middle + ' ' + a.y +
+        ' ' + middle + ' ' + b.y + ' ' + to + ' ' + b.y, fill:'none',
         stroke:colors[node.status], 'stroke-width':2, 'stroke-dasharray':node.status === 'blocked' ? '6 5' : 'none'}));
     }
   }
   const ordered = mode === 'neural' ? [...visible].sort((a, b) =>
     positions.get(b.node_id).depth - positions.get(a.node_id).depth) : visible;
+  const bodyColor = node => node.kind === 'group' ? '#443573' : '#19405b';
+  let usingWebGL = false;
+  if (mode === 'neural') {
+    if (paintNeural === undefined) paintNeural = createNeuralRenderer(neuralLayer);
+    if (paintNeural) {
+      const bounds = graph.getBoundingClientRect();
+      const points = ordered.filter(node => node.status !== 'blocked').map(node => {
+        const {x, y, depth} = positions.get(node.node_id);
+        return {x, y, radius:radiusOf(depth) + 2, ring:colors[node.status], body:bodyColor(node)};
+      });
+      usingWebGL = paintNeural(points, width, height, bounds.width, bounds.height);
+    }
+  }
+  neuralLayer.hidden = !usingWebGL;
   for (const node of ordered) {
     const {x, y, depth, index} = positions.get(node.node_id), color = colors[node.status];
     const group = draw('g', {tabindex:0, role:'button', 'aria-label':node.rule + ' ' + node.status,
@@ -178,12 +209,14 @@ function render(focus = false) {
           width:Math.max(4, 550 * duration / total), height:20, rx:5, fill:color}),
         draw('text', {x:980, y:row + 15, fill:color, 'text-anchor':'end'}, node.status));
     } else {
-      const distance = Math.max(1200, height, width);
-      const radius = mode === 'neural' ? 24 * distance / (distance + depth) : 24;
-      group.append(draw('circle', {cx:x, cy:y, r:radius, stroke:color, 'stroke-width':4,
+      const radius = mode === 'neural' ? radiusOf(depth) : 24;
+      const painted = usingWebGL && node.status !== 'blocked';
+      group.append(draw('circle', {cx:x, cy:y, r:radius,
+        stroke:painted ? 'none' : color, 'stroke-width':4,
         'stroke-dasharray':node.status === 'blocked' ? '5 4' : 'none',
-        fill:node.kind === 'group' ? '#443573' : '#19405b'}),
-        draw('text', {x, y:y + 6, fill:'#fff', 'text-anchor':'middle', 'font-size':21}, symbols[node.status]),
+        fill:painted ? 'transparent' : bodyColor(node)}),
+        draw('text', {x, y:y + 6, fill:'#fff', 'text-anchor':'middle', 'font-size':21,
+          class:node.status === 'running' ? 'running-symbol' : ''}, symbols[node.status]),
         draw('text', {x, y:y + 43, fill:'#e2e8f0', 'text-anchor':'middle'}, label));
     }
     const choose = () => { selected = node; render(true); };
@@ -208,6 +241,7 @@ for (const button of tabs) {
     render();
   };
 }
+window.addEventListener('resize', () => { if (mode === 'neural') render(); });
 for (const id of ['filter','angle','tilt']) byId(id).addEventListener('input', () => render());
 render();
 </script>

@@ -145,6 +145,9 @@ def report(events: Path, output: Path, format: str) -> None:
     else:
         assets = files("pipeforge").joinpath("studio_assets")
         template = assets.joinpath("report.html").read_text(encoding="utf-8")
+        template = template.replace(
+            "/*NEURAL*/", assets.joinpath("neural.js").read_text(encoding="utf-8")
+        )
         payload = json.dumps(journal).replace("<", r"\u003c")
         content = template.replace(
             "/*TOKENS*/", assets.joinpath("tokens.css").read_text(encoding="utf-8")

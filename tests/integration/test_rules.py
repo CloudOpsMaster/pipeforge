@@ -309,3 +309,103 @@ def test_portable_example_and_golden_workflow(provider, fixture, monkeypatch, ca
     assert capsys.readouterr().out == expected.read_text()
     assert main(["import", provider, str(expected), "-f", example]) == 0
     assert json.loads(capsys.readouterr().out)["rule"] == "demo.report"
+
+
+def test_standalone_exports_preserve_status_and_reject_parallel(project, capsys):
+    write(
+        project,
+        """version: 1
+good: {run: 'exit 0'}
+bad: {run: 'exit 13'}
+skip: {run: 'exit 42'}
+sequence:
+  steps: [{use: good}, {use: bad}, {use: skip}]
+parallel:
+  steps: [{parallel: [{use: good}, {use: bad}]}]
+""",
+    )
+    for provider in ("github", "gitlab", "jenkins"):
+        output = project / provider
+        assert (
+            main(["export", provider, "sequence", "--mode", "standalone", "-o", str(output)]) == 0
+        )
+        workflow = output.read_text()
+        if provider == "github":
+            command = yaml.safe_load(workflow)["jobs"]["pipeforge"]["steps"][1]["run"]
+            output.write_text(workflow.replace("'on':", "on:"))
+        elif provider == "gitlab":
+            command = yaml.safe_load(workflow)["pipeforge"]["script"][0]
+        else:
+            command = workflow.split("sh '", 1)[1].split("'", 1)[0]
+        assert subprocess.run(["/bin/sh", "-ec", command], check=False).returncode == 13
+        assert main(["import", provider, str(output), "--standalone-rule", "sequence"]) == 0
+        assert json.loads(capsys.readouterr().out)["mode"] == "standalone"
+        assert main(["import", provider, str(output), "--native"]) == 0
+        converted = capsys.readouterr().out
+        portable = write(project, converted, f"{provider}-import.yml")
+        assert main(["native.run", "--file", str(portable)]) == 13
+        capsys.readouterr()
+        assert main(["export", provider, "parallel", "--mode", "standalone"]) == 2
+        assert "parallel execution" in capsys.readouterr().out
+
+
+def test_observation_separates_health_and_digest(project, capsys):
+    snapshot = write(
+        project,
+        """apiVersion: apps/v1
+kind: Deployment
+metadata: {generation: 2}
+spec: {replicas: 2}
+status: {observedGeneration: 2, replicas: 2, updatedReplicas: 2, availableReplicas: 2}
+""",
+    )
+    desired = "sha256:" + "a" * 64
+    observed = "sha256:" + "b" * 64
+    args = ["observe", str(snapshot), "--desired-digest", desired]
+    assert main(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["drift"] is None and result["rollout_health"] == "healthy"
+    snapshot.write_text(
+        snapshot.read_text().replace("observedGeneration: 2", "observedGeneration: 1")
+    )
+    assert main([*args, "--observed-digest", observed]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["drift"] is True and result["rollout_health"] == "progressing"
+
+
+def test_mcp_is_read_only_and_does_not_expose_log_text(project, capsys):
+    from io import BytesIO, StringIO
+
+    from pipeforge.rule_mcp import serve
+
+    write(project, "version: 1\nsafe: {argv: [printf, private-text]}\n")
+    journal = project / "events.jsonl"
+    assert main(["safe", "--events", str(journal)]) == 0
+    capsys.readouterr()
+    requests = [
+        {"id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25"}},
+        {"method": "notifications/initialized"},
+        {"id": 2, "method": "tools/list"},
+        {"id": 3, "method": "tools/call", "params": {"name": "execution_graph"}},
+        {
+            "id": 4,
+            "method": "tools/call",
+            "params": {
+                "name": "execution_graph",
+                "arguments": {"path": "/var/other.jsonl"},
+            },
+        },
+        {"id": 5, "method": "tools/call", "params": {"name": "run"}},
+    ]
+    source = BytesIO(
+        "".join(json.dumps({"jsonrpc": "2.0", **request}) + "\n" for request in requests).encode()
+    )
+    sink = StringIO()
+    serve(journal, source, sink)
+    payload = sink.getvalue()
+    responses = [json.loads(line) for line in payload.splitlines()]
+    assert "private-text" not in payload
+    assert [r["id"] for r in responses] == [1, 2, 3, 4, 5]
+    assert responses[1]["result"]["tools"][0]["annotations"]["readOnlyHint"]
+    assert responses[2]["result"]["structuredContent"]["nodes"][0]["status"] == "success"
+    assert all("error" in response for response in responses[3:])

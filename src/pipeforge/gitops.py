@@ -99,3 +99,52 @@ def child(node: Node | None, key: str) -> Node:
     return next(
         value for name, value in fields if isinstance(name, ScalarNode) and name.value == key
     )
+
+
+def observe(path: Path, desired: str, observed: str | None) -> dict[str, str | bool | None]:
+    """Compare distinct desired and observed digests with captured rollout status."""
+    if not DIGEST.fullmatch(desired) or (observed is not None and not DIGEST.fullmatch(observed)):
+        raise ConfigError("Use a full lowercase SHA-256 digest.")
+    if not path.is_file():
+        raise ConfigError("Expected a regular Deployment snapshot file.")
+    data = mapping(read_yaml_document(path)[0], "Deployment")
+    if (data.get("apiVersion"), data.get("kind")) != ("apps/v1", "Deployment"):
+        raise ConfigError("Expected a single apps/v1 Deployment snapshot.")
+    metadata = mapping(data.get("metadata", {}), "Deployment metadata")
+    spec = mapping(data.get("spec", {}), "Deployment spec")
+    status = mapping(data.get("status", {}), "Deployment status")
+    generation = metadata.get("generation")
+    seen = status.get("observedGeneration")
+    desired_replicas = spec.get("replicas", 1)
+    replicas = [status.get(key, 0) for key in ("replicas", "updatedReplicas", "availableReplicas")]
+    conditions = status.get("conditions", [])
+    if not isinstance(conditions, list):
+        raise ConfigError("Deployment conditions must be a list.")
+    health = "unknown"
+    if (
+        type(generation) is int
+        and type(seen) is int
+        and type(desired_replicas) is int
+        and desired_replicas >= 0
+        and all(type(value) is int and value >= 0 for value in replicas)
+    ):
+        if seen < generation:
+            health = "progressing"
+        elif any(
+            isinstance(item, dict)
+            and item.get("type") == "Progressing"
+            and item.get("status") == "False"
+            and item.get("reason") == "ProgressDeadlineExceeded"
+            for item in conditions
+        ):
+            health = "degraded"
+        elif all(value == desired_replicas for value in replicas):
+            health = "healthy"
+        else:
+            health = "progressing"
+    return {
+        "desired_digest": desired,
+        "observed_digest": observed,
+        "drift": None if observed is None else desired != observed,
+        "rollout_health": health,
+    }

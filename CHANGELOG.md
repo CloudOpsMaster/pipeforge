@@ -5,7 +5,8 @@
 - Add versioned named rules, typed inputs, local includes, parallel calls and dry runs alongside the legacy jobs CLI.
 - Record ordered execution events and render offline Studio reports in HTML, SVG and JSON.
 - Generate and inspect one-job GitHub Actions, GitLab CI and Jenkins wrappers. Existing GitHub job rendering remains available.
-- Draft a digest-only GitOps promotion patch for a Kubernetes Deployment and compare an optionally supplied observed digest.
+- Draft digest-only GitOps promotion patches and report Kubernetes Deployment rollout health from read-only snapshots.
+- Add a restricted standalone native profile, WebGL rendering for Neural 3D and read-only MCP graph inspection.
 
 ## 0.2.0
 

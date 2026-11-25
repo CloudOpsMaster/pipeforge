@@ -18,7 +18,7 @@ pipeforge studio events.jsonl --format json -o studio.json
 
 The archive’s Docker and scanner example is available in `examples/rules/integrations.yml`. Inspect it with `pipeforge docker.build -f examples/rules/integrations.yml --dry-run`. A real run needs Docker and a suitable build context.
 
-The demonstration exits 3 and emits a blocked downstream node. Run the report command separately after the intentional failure. Event and report outputs require new filenames. Open the HTML file locally. Blue Ocean, Neural 3D and Timeline share one journal and selection. Neural 3D projects XYZ coordinates and offers rotation and tilt. Logs are bounded, masked and displayed as text. JSON is an array of events conforming to `schema/event.schema.json`.
+The demonstration exits 3 and emits a blocked downstream node. Run the report command separately after the intentional failure. Event and report outputs require new filenames. Open the HTML file locally. Blue Ocean, Neural 3D and Timeline share one journal and selection. Neural 3D renders a rotatable, depth-shaded graph with WebGL. Browsers without WebGL use a projected SVG view with the same controls and keyboard navigation. Logs are bounded, masked and displayed as text. JSON is an array of events conforming to `schema/event.schema.json`.
 
 An explicit file takes precedence. Otherwise the nearest directory containing either `pipeforge.yml` or `pipeforge.yaml` wins, up to and including the Git root. Outside Git only the current directory is searched. Two candidates in the winning directory are an error. Top-level CLI command names are reserved. Load Bash or Zsh completions by reviewing the shell source printed by `pipeforge completion bash|zsh`. Regenerate the completion after adding rules or switching projects.
 
@@ -51,10 +51,13 @@ pipeforge import github workflow.yml --file examples/rules/portable.yml
 | Rule wrapper | Manual dispatch, labeled runner, pinned checkout with read-only permissions | Manual web pipeline on a protected ref, tagged runner | Declarative pipeline, labeled agent |
 | Runner setup | Preinstall a pinned PipeForge version, restrict the runner pool to trusted refs | Preinstall a pinned PipeForge version and use a protected runner | Preinstall a pinned PipeForge version and configure trusted SCM checkout |
 | Local steps and parallel groups | One job and workspace | One job and workspace | One agent and workspace |
-| Import | Generated wrapper shape | Generated wrapper shape | Generated declarative text |
-| Standalone native DAG, provider approvals, secret binding, cross-job artifacts | Unsupported | Unsupported | Unsupported |
+| Import | Single-job wrapper or native profile | Single-job wrapper or native profile | Matching declarative profile |
+| Standalone sequential builtins | Supported | Supported | Supported |
+| Native multi-job DAG, provider approvals, secret binding, cross-job artifacts | Unsupported | Unsupported | Unsupported |
 
-Import returns the matched wrapper and rule as JSON after validating the supplied workflow against the configuration. Export and import reject features outside their supported subset and report a source location. Standalone export and export of rule files with declared secrets fail closed. A wrapper preserves local work within one native job. Moving work across native jobs requires a registry or an authenticated artifact handoff. Provider linting and real runner execution are separate validation gates.
+Import returns the matched wrapper and rule as JSON after validating the supplied workflow against the configuration. Export and import reject features outside their supported subset and report a source location. Standalone export lowers only literal `:`, `true`, `false`, and `exit 0` through `exit 99`. Parenthesized commands preserve the exit status of each child, and sequential execution stops at the first failure. Parallel steps, inputs, tool checks and declared secrets require wrapper execution or a separately reviewed provider configuration. Wrapper export also rejects declared secrets because provider bindings are unsupported.
+
+Use `pipeforge export github RULE --mode standalone -f portable.yml` for a compatible rule. Use `pipeforge import github workflow.yml --native > portable.yml` to recover a versioned config from the supported native profile, then run `pipeforge native.run -f portable.yml`. The imported file describes command execution. Keep the source workflow for its trigger and runner policy. Use `--standalone-rule RULE -f portable.yml` to check an existing workflow against a known rule instead. A wrapper preserves local work within one native job. Moving work across native jobs requires a registry or an authenticated artifact handoff. Provider linting and real runner execution are separate validation gates.
 
 ## GitOps promotion draft
 
@@ -64,7 +67,29 @@ git apply --check --unidiff-zero promotion.patch
 git apply --unidiff-zero promotion.patch
 ```
 
-Supply 64 lowercase hex digits in `REVIEWED_DIGEST`. The generated patch updates one container image in an `apps/v1` Deployment and preserves surrounding YAML. Review the change through your existing PR process, then let your GitOps controller reconcile the approved ref. Supply `--observed-digest` to compare an independently observed runtime digest to the proposed digest. Live drift collection, controller health and PR creation remain future work.
+Supply 64 lowercase hex digits in `REVIEWED_DIGEST`. The generated patch updates one container image in an `apps/v1` Deployment and preserves surrounding YAML. Review the change through your existing PR process, then let your GitOps controller reconcile the approved ref. Supply `--observed-digest` to compare an independently observed runtime digest to the proposed digest. The CLI does not need Kubernetes write credentials.
+
+To inspect rollout health, export a Deployment snapshot with your read-only cluster tooling and pass the file to:
+
+```sh
+pipeforge observe deployment-snapshot.yml --desired-digest "sha256:$REVIEWED_DIGEST" \
+  --observed-digest "sha256:$RUNNING_DIGEST"
+```
+
+Derive `RUNNING_DIGEST` independently from runtime observations. Omit it when runtime image identity is unknown. The command returns drift separately from rollout health, using Deployment generation, replica counts and progress deadline status. It does not infer the running digest from the desired Deployment image or report Argo CD or Flux controller health.
+
+## Read-only MCP
+
+Start the local stdio server from an MCP host that supports protocol revision `2025-11-25`:
+
+```json
+{
+  "command": "pipeforge",
+  "args": ["mcp", "/absolute/path/to/events.jsonl"]
+}
+```
+
+The host chooses one journal at startup. The `execution_graph` tool accepts no arguments and returns node IDs, dependencies, statuses, exit codes and timings. Free-text logs and rule names stay in the local Studio report. The server has no command, file-write, network or model endpoint. A host can analyze the graph and present a proposed change for review. Applying a proposal remains a human action.
 
 ## Studio captures
 
@@ -72,10 +97,12 @@ Supply 64 lowercase hex digits in `REVIEWED_DIGEST`. The generated patch updates
 - [Neural 3D](studio/neural-3d.png)
 - [Timeline](studio/timeline.png)
 
-These captures show the same run of `demo.report`. Event JSON can feed a read-only consumer. AI analysis, MCP transport, large-graph clustering, live events and a WebGL-based Studio remain outside this slice.
+These captures show the same run of `demo.report`. Large-graph clustering, live SSE, direct controller integrations and provider-wide workflow translation remain outside this slice.
 
 ## Verification record
 
 Baseline `42acc153e8faaa983b85efc8907027f952ca02b8` on macOS returned 199 passing tests and one version check failure. The local environment still had PipeForge 0.1.0 installed. After installing a 0.2.0 wheel, the legacy suite and the new rule tests passed together.
 
 Local verification covered the full pytest suite, Ruff, mypy, Bandit, wheel and source distribution builds, Twine metadata checks, an installed-wheel smoke test and SHA-256 verification of prepared release files. The runtime requirements audit reported zero known vulnerabilities and produced a CycloneDX inventory. The existing development environment audit reported advisories in certifi, filelock, msgpack and setuptools. Provider round trips used golden fixtures. Real provider runners, Linux, Windows, production staging and release signing remain unverified.
+
+Follow-up verification covers standalone status parity via POSIX sh, native import round trips, rollout snapshot drift, MCP stdio requests and the active WebGL path in local Chromium.

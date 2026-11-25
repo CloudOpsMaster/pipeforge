@@ -6,7 +6,7 @@ The highest-risk boundary is a privileged runner executing repository-controlled
 
 ## Scope and assumptions
 
-Scope covers the installed CLI, legacy job runner, portable rules, wrapper compilers, event reports and local promotion patches. The CLI runs on developer hosts and controlled CI runners. The archive specifies reviewed configuration, read-only AI and PR-based promotion. Controller, registry and hosted CI administration are external. Runner network reachability, credential lifetimes and cloud identity policy depend on deployment.
+Scope covers the installed CLI, legacy job runner, portable rules, wrapper compilers, event reports, read-only MCP and local promotion patches. The CLI runs on developer hosts and controlled CI runners. The archive specifies reviewed configuration, read-only AI and PR-based promotion. Controller, registry and hosted CI administration are external. Runner network reachability, credential lifetimes and cloud identity policy depend on deployment.
 
 ## System model
 
@@ -20,6 +20,7 @@ Scope covers the installed CLI, legacy job runner, portable rules, wrapper compi
 - CLI → child process through OS subprocess arguments, environment and working directory. Declared inputs are typed. Shell commands use trusted source. Process groups receive timeout and cancellation.
 - Child output → event journal → browser over local files. Journals use restrictive creation permissions, mask configured literal values and limit output. Studio renders text via DOM APIs under a restrictive content policy.
 - CI manifest → provider runner through native job configuration. Wrappers assume controlled runner registration and trusted refs. Provider queue and checkout authentication remain provider responsibilities.
+- A preselected journal → MCP client over local stdio. The single tool emits validated graph fields. It accepts no paths or parameters and omits arbitrary text.
 - Operator arguments → GitOps patch over the local CLI. Manifest shape, digest and selected container are checked. Repository review and controller reconciliation happen independently.
 
 #### Diagram
@@ -30,6 +31,7 @@ flowchart LR
   Parser --> Runner
   CI --> Runner
   Runner --> Journal
+  Journal --> MCP
   Journal --> Studio
   Operator --> Patch
   Patch --> Review
@@ -61,6 +63,7 @@ The CLI exposes no network listener. Attacker access to a protected runner or th
 | Jobs, rules and scripts | CLI arguments and local YAML | Repository to runner | Code execution by design | `config.py`, `rules.py`, `executor.py` |
 | Workflow import and export | Provider file passed locally | Configuration to provider | Reject unsupported provider semantics | `rule_ci.py` |
 | Runtime logs and Studio | JSONL and offline browser | Process output to viewer | Display untrusted text | `rule_runtime.py`, `studio.py` |
+| MCP graph | Local stdio requests | Journal to model host | Fixed snapshot and typed fields | `rule_mcp.py` |
 | Deployment patch | Manifest and digest argument | Operator to review | Draft only | `gitops.py` |
 
 ## Top abuse paths
