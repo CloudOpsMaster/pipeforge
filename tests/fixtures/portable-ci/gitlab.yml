@@ -1,0 +1,8 @@
+workflow:
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_REF_PROTECTED == "true"
+pipeforge:
+  tags:
+  - pipeforge
+  script:
+  - pipeforge demo.report --file examples/rules/portable.yml

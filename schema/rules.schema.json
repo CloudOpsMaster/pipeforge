@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PipeForge version 1 rule configuration",
+  "description": "Use pipeforge validate to check includes, source confinement and call graphs.",
+  "$ref": "#/$defs/module",
+  "required": ["version"],
+  "$defs": {
+    "module": {
+      "type": "object",
+      "properties": {
+        "version": {"const": 1},
+        "include": {"type": "array", "items": {"type": "string"}},
+        "vars": {"type": "object", "additionalProperties": {"$ref": "#/$defs/scalar"}},
+        "secrets": {"type": "array", "items": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}}
+      },
+      "patternProperties": {
+        "^(?!(version|include|vars|secrets|name|values|pipeline|blocks|run|jobs|plan|graph|exec-job|render|validate|list|explain|completion|export|import|studio|promote)$)[A-Za-z_][A-Za-z0-9_-]{0,63}$": {
+          "$ref": "#/$defs/branch"
+        }
+      },
+      "additionalProperties": false
+    },
+    "scalar": {"type": ["string", "integer", "boolean"]},
+    "branch": {
+      "anyOf": [
+        {"$ref": "#/$defs/rule"},
+        {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_-]{0,63}$"},
+          "additionalProperties": {"$ref": "#/$defs/branch"}
+        }
+      ]
+    },
+    "call": {
+      "type": "object",
+      "required": ["use"],
+      "additionalProperties": false,
+      "properties": {
+        "use": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_.-]*$"},
+        "with": {"type": "object", "additionalProperties": {"$ref": "#/$defs/scalar"}}
+      }
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{"required": ["run"]}, {"required": ["script"]}, {"required": ["argv"]}, {"required": ["steps"]}],
+      "properties": {
+        "run": {"anyOf": [{"type": "string", "minLength": 1}, {"$ref": "#/$defs/argv"}]},
+        "script": {"type": "string", "minLength": 1},
+        "argv": {"$ref": "#/$defs/argv"},
+        "timeout": {"type": "integer", "minimum": 1, "maximum": 86400},
+        "tools": {
+          "oneOf": [
+            {"type": "array", "items": {"type": "string"}},
+            {"type": "object", "additionalProperties": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}}
+          ]
+        },
+        "inputs": {
+          "type": "object",
+          "propertyNames": {"pattern": "^[A-Za-z_][A-Za-z0-9_]*$"},
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": {"enum": ["string", "integer", "boolean"]},
+              "default": {"$ref": "#/$defs/scalar"}
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "oneOf": [
+              {"$ref": "#/$defs/call"},
+              {
+                "type": "object",
+                "required": ["parallel"],
+                "additionalProperties": false,
+                "properties": {"parallel": {"type": "array", "minItems": 1, "maxItems": 16, "items": {"$ref": "#/$defs/call"}}}
+              }
+            ]
+          }
+        }
+      }
+    },
+    "argv": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+  }
+}

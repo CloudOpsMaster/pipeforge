@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PipeForge rule execution event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "node_id",
+    "rule",
+    "sequence",
+    "status",
+    "timestamp"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "node_id": {
+      "type": "string"
+    },
+    "rule": {
+      "type": "string"
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "status": {
+      "enum": [
+        "pending",
+        "running",
+        "success",
+        "failed",
+        "blocked",
+        "cancelled",
+        "skipped",
+        "warning",
+        "approval"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exit_code": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "message": {
+      "type": "string"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "file",
+        "line"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "kind": {
+      "enum": [
+        "group",
+        "command"
+      ]
+    },
+    "children": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

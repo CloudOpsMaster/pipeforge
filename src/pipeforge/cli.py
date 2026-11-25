@@ -14,6 +14,7 @@ from pipeforge.errors import ConfigError, ExecutionError, Terminated
 from pipeforge.graph import ordered_jobs, render_graph, select_jobs, select_stage
 from pipeforge.logging import Logger, Masker
 from pipeforge.resolver import Resolver
+from pipeforge.rule_cli import dispatch, normalize
 
 
 def terminate(signum: int, frame: FrameType | None) -> None:
@@ -22,7 +23,12 @@ def terminate(signum: int, frame: FrameType | None) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="pipeforge", description="Define once. Run anywhere. Debug locally."
+        prog="pipeforge",
+        description="Define once. Run anywhere. Debug locally.",
+        epilog=(
+            "Rule commands: <rule.name>, list, explain, completion, export, import, "
+            "studio, promote. Use COMMAND --help for options."
+        ),
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -57,10 +63,15 @@ def main(argv: list[str] | None = None) -> int:
             needs.add_argument("--no-needs", dest="with_needs", action="store_false")
             child.add_argument("--from", dest="from_job")
             child.add_argument("--until", dest="until_job")
-    args = parser.parse_args(argv)
-    logger = Logger(sys.stdout, Masker(()), color=args.color)
+    arguments = normalize(sys.argv[1:] if argv is None else argv)
+    logger = Logger(sys.stdout, Masker(()))
     previous_handler = signal.signal(signal.SIGTERM, terminate)
     try:
+        result = dispatch(arguments)
+        if result is not None:
+            return result
+        args = parser.parse_args(arguments)
+        logger = Logger(sys.stdout, Masker(()), color=args.color)
         config = load_config(args.file)
         logger = Logger(
             sys.stdout,

@@ -48,6 +48,10 @@ Then run:
 
 No manual `pip install` or virtualenv activation. The launcher prepares an isolated, cached runtime on first use; Python with `venv` support and package-index access are required. Warm runs reuse the runtime. `.pf/` is the framework; `.pipeforge/` holds application runtime, cache, logs, and reports.
 
+## Versioned rules
+
+The installed CLI also accepts named rules such as `pipeforge docker.build`. See the [portable rules guide](docs/portable-rules.md) for configuration, migration, CI wrappers and Studio.
+
 ## Output
 
 The terminal uses purple headings, cyan progress, green successes, amber notices, and red failures. Colors are automatic for terminals, can be forced with `--color always`, and disabled with `--color never` or `NO_COLOR` in automatic mode.

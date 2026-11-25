@@ -1,0 +1,20 @@
+version: 1
+demo:
+  print:
+    inputs:
+      text:
+        type: string
+        default: hello
+    argv: [printf, '%s\n', '${inputs.text}']
+  fail:
+    run: exit 3
+  report:
+    steps:
+      - use: demo.print
+        with: {text: Preparing}
+      - parallel:
+          - use: demo.print
+            with: {text: Testing}
+          - use: demo.fail
+      - use: demo.print
+        with: {text: Publishing}

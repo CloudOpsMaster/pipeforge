@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from yaml.events import AliasEvent
+from yaml.events import AliasEvent, CollectionEndEvent, CollectionStartEvent
 from yaml.nodes import MappingNode
 
 from pipeforge.errors import ConfigError
@@ -112,17 +112,30 @@ def validate_values(values: dict[str, Any], depth: int = 0) -> None:
             raise ConfigError("values cannot contain NUL characters.")
 
 
-def load_config(path: Path) -> Config:
+def read_yaml(path: Path, loader: type[StrictLoader] = StrictLoader) -> Any:
+    return read_yaml_document(path, loader)[0]
+
+
+def read_yaml_document(path: Path, loader: type[StrictLoader] = StrictLoader) -> tuple[Any, str]:
     try:
         with path.open("rb") as handle:
             content = handle.read(MAX_CONFIG_BYTES + 1)
         if len(content) > MAX_CONFIG_BYTES:
             raise ConfigError("Configuration exceeds the 1 MiB limit.")
         source = content.decode("utf-8")
-        if any(isinstance(event, AliasEvent) for event in yaml.parse(source)):
-            raise ConfigError("YAML aliases are not supported.")
+        depth = 0
+        for event in yaml.parse(source):
+            if isinstance(event, AliasEvent):
+                raise ConfigError("YAML aliases are not supported.")
+            if isinstance(event, CollectionStartEvent):
+                depth += 1
+                if depth > 64:
+                    raise ConfigError("YAML nesting exceeds 64 levels.")
+            elif isinstance(event, CollectionEndEvent):
+                depth -= 1
         # StrictLoader extends SafeLoader only to reject duplicate/non-string keys.
-        data = yaml.load(source, Loader=StrictLoader)  # nosec B506
+        data = yaml.load(source, Loader=loader)  # nosec B506
+        return data, source
     except (OSError, UnicodeError):
         raise ConfigError(
             "Cannot read configuration as UTF-8; check the file and permissions."
@@ -133,7 +146,9 @@ def load_config(path: Path) -> Config:
             "Invalid YAML; check syntax, nesting, and supported YAML types."
         ) from None
 
-    data = mapping(data, "configuration")
+
+def load_config(path: Path) -> Config:
+    data = mapping(read_yaml(path), "configuration")
     fields(data, {"name", "values", "secrets", "pipeline", "jobs", "blocks"}, "configuration")
     name = text(data.get("name"), "name")
     values = mapping(data.get("values", {}), "values")

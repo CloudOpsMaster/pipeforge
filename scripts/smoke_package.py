@@ -48,6 +48,20 @@ def main() -> None:
         )
         for args in (["--version"], ["validate"], ["run", "--dry-run"], ["run"]):
             subprocess.run([str(cli), *args], cwd=temporary, env=env, check=True, timeout=15)
+        (temporary / "pipeforge.yml").write_text(
+            (root / "examples/rules/portable.yml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+        for args in (
+            ["validate"],
+            ["demo.print", "--events", "events.jsonl"],
+            ["studio", "events.jsonl", "-o", "report.html"],
+            ["export", "github", "demo.print"],
+            ["export", "gitlab", "demo.print"],
+        ):
+            subprocess.run([str(cli), *args], cwd=temporary, env=env, check=True, timeout=15)
+        if "PipeForge Studio" not in (temporary / "report.html").read_text(encoding="utf-8"):
+            raise SystemExit("The installed wheel did not render the Studio report.")
     print("Wheel installation and CLI smoke checks passed outside the checkout.")
 
 
