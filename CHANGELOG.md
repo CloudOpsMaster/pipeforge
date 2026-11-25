@@ -1,12 +1,36 @@
 # Changelog
 
-## Unreleased portable rules draft
+## 0.3.0
 
 - Add versioned named rules, typed inputs, local includes, parallel calls and dry runs alongside the legacy jobs CLI.
 - Record ordered execution events and render offline Studio reports in HTML, SVG and JSON.
 - Generate and inspect one-job GitHub Actions, GitLab CI and Jenkins wrappers. Existing GitHub job rendering remains available.
 - Draft digest-only GitOps promotion patches and report Kubernetes Deployment rollout health from read-only snapshots.
 - Add a restricted standalone native profile, WebGL rendering for Neural 3D and read-only MCP graph inspection.
+
+Portable rule execution and reports use the installed CLI. Native export supports a restricted sequential profile. Provider-wide workflow translation remains outside this release.
+
+## 0.2.1
+
+### Security and maintenance
+
+- Update the pinned development/CI dependency setuptools from 84.0.0 to 84.2.1,
+  addressing [GHSA-xmj3-9gf7-h52w](https://github.com/advisories/GHSA-xmj3-9gf7-h52w).
+  The advisory concerns a Windows path escape in legacy wheel installation:
+  crafted namespace metadata can create a fixed-content `__init__.py` outside
+  the intended installation directory. The first patched setuptools version is 84.1.0.
+- This dependency fix applies to contributor and CI environments. PipeForge supports
+  Linux/macOS host execution; its runtime code and runtime dependencies are unchanged.
+- Update commit-pinned GitHub Actions: checkout to 7.0.1, setup-python to 7.1.0,
+  upload-artifact to 7.0.2, and download-artifact to 8.0.2. These are CI maintenance
+  updates; no additional PipeForge vulnerability fix is claimed.
+- Update development tools to mypy 2.4.1, Ruff 0.17.3, and types-PyYAML
+  6.0.12.20261030. Update Hatchling to 1.33.0 and its build-system minimum accordingly.
+
+### Documentation
+
+- Translate the development plan and diagrams into English and establish English
+  as the project language. Preserve multibyte Unicode secret-masking test coverage.
 
 ## 0.2.0
 

@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling>=1.33.0,<2"]
 build-backend = "hatchling.build"
 
 [project]
 name = "pipeforge"
-version = "0.2.0"
+version = "0.3.0"
 description = "Run small, reusable pipelines locally and on CI runners."
 readme = "README.md"
 requires-python = ">=3.11"

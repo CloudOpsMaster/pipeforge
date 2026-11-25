@@ -1,5 +1,7 @@
 # Configuration and command reference
 
+This page documents jobs and legacy pipelines. For `version: 1` named rules, see [Portable rules and Studio](portable-rules.md).
+
 The launcher `./.pf/run` discovers `pipeforge.yml` from the current directory upward, or uses `-f PATH`. It never silently uses the framework's own pipeline when called from an application. Commands run in the configuration file's directory. The installed CLI accepts an explicit subcommand: `pipeforge run`, `pipeforge jobs`, or `pipeforge validate`.
 
 ## Jobs and steps
